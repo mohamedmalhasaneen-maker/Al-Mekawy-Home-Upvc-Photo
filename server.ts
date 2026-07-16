@@ -6,8 +6,8 @@ import { createServer as createViteServer } from "vite";
 const app = express();
 const PORT = 3000;
 
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 const GALLERY_FILE = path.join(process.cwd(), 'gallery_photos.json');
 const CATALOG_FILE = path.join(process.cwd(), 'catalog_data.json');
@@ -28,7 +28,7 @@ function readJsonFile(filePath: string, fallback: any) {
 // Helper to write JSON safely
 function writeJsonFile(filePath: string, data: any) {
   try {
-    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+    fs.writeFileSync(filePath, JSON.stringify(data), 'utf-8');
     return true;
   } catch (error) {
     console.error(`Error writing ${filePath}:`, error);

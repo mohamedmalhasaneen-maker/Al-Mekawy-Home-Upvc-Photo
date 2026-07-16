@@ -297,8 +297,8 @@ export default function App() {
           
           ctx.drawImage(img, 0, 0, width, height);
 
-          // تصدير الصورة بجودة مضغوطة 70% للحفاظ على مساحة التخزين وسرعة التصفح
-          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          // تصدير الصورة بجودة مضغوطة 60% للحفاظ على مساحة التخزين وسرعة التصفح وتجنب مشاكل الشبكة
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.6);
           resolve(compressedDataUrl);
         };
         img.onerror = () => reject(new Error('فشل تحميل محتوى الصورة المحددة'));

@@ -334,20 +334,36 @@ export default function App() {
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !uploadContext) return;
+    const files = e.target.files;
+    if (!files || files.length === 0 || !uploadContext) return;
 
-    showToast('⏳ جاري معالجة وضغط الصورة المرفوعة...', 'info');
+    if (files.length > 1) {
+      showToast(`⏳ جاري معالجة وضغط ${files.length} من الصور المرفوعة دفعة واحدة...`, 'info');
+    } else {
+      showToast('⏳ جاري معالجة وضغط الصورة المرفوعة...', 'info');
+    }
 
     try {
-      const base64Image = await processAndCompressImage(file);
+      const results = await Promise.allSettled(
+        (Array.from(files) as File[]).map(file => processAndCompressImage(file))
+      );
+
+      const base64Images = results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => (r as PromiseFulfilledResult<string>).value);
+
+      if (base64Images.length === 0) {
+        showToast('❌ لم يتم بنجاح معالجة وضغط أي صورة من الملفات المحددة.', 'error');
+        return;
+      }
+
       const updatedCatalog = [...catalog];
 
       if (uploadContext.type === 'category' && uploadContext.categoryId) {
         // تحديث صورة القسم الرئيسي (Doors or Windows)
         const catIdx = updatedCatalog.findIndex(c => c.id === uploadContext.categoryId);
         if (catIdx !== -1) {
-          updatedCatalog[catIdx].image = base64Image;
+          updatedCatalog[catIdx].image = base64Images[0];
           saveCatalogState(updatedCatalog);
           showToast('📸 تم تحديث غلاف القسم بنجاح!', 'success');
         }
@@ -358,11 +374,11 @@ export default function App() {
         if (catIdx !== -1) {
           const subIdx = updatedCatalog[catIdx].subtypes.findIndex(s => s.id === uploadContext.subtypeId);
           if (subIdx !== -1) {
-            updatedCatalog[catIdx].subtypes[subIdx].image = base64Image;
+            updatedCatalog[catIdx].subtypes[subIdx].image = base64Images[0];
             
             // تحديث الضلفة المعروضة حالياً إن وجدت لتحديث فوري
             if (selectedSubtype && selectedSubtype.id === uploadContext.subtypeId) {
-              setSelectedSubtype({ ...selectedSubtype, image: base64Image });
+              setSelectedSubtype({ ...selectedSubtype, image: base64Images[0] });
             }
             
             saveCatalogState(updatedCatalog);
@@ -371,7 +387,7 @@ export default function App() {
         }
       } 
       else if (uploadContext.type === 'gallery-add' && uploadContext.categoryId && uploadContext.subtypeId) {
-        // إضافة صورة جديدة لمعرض الأعمال المنفذة
+        // إضافة صور جديدة لمعرض الأعمال المنفذة (دعم صور متعددة)
         const catIdx = updatedCatalog.findIndex(c => c.id === uploadContext.categoryId);
         if (catIdx !== -1) {
           const subIdx = updatedCatalog[catIdx].subtypes.findIndex(s => s.id === uploadContext.subtypeId);
@@ -379,24 +395,28 @@ export default function App() {
             if (!updatedCatalog[catIdx].subtypes[subIdx].gallery) {
               updatedCatalog[catIdx].subtypes[subIdx].gallery = [];
             }
-            updatedCatalog[catIdx].subtypes[subIdx].gallery.push(base64Image);
+            updatedCatalog[catIdx].subtypes[subIdx].gallery.push(...base64Images);
             
             // تحديث الضلفة المعروضة حالياً لتحديث فوري للمعرض المفتوح أمام المستخدم
             if (selectedSubtype && selectedSubtype.id === uploadContext.subtypeId) {
               setSelectedSubtype({ 
                 ...selectedSubtype, 
-                gallery: [...(selectedSubtype.gallery || []), base64Image] 
+                gallery: [...(selectedSubtype.gallery || []), ...base64Images] 
               });
             }
 
             saveCatalogState(updatedCatalog);
-            showToast('✅ تم إضافة الصورة لمعرض أعمال القطاع بنجاح!', 'success');
+            if (base64Images.length > 1) {
+              showToast(`✅ تم إضافة ${base64Images.length} صور لمعرض أعمال القطاع بنجاح!`, 'success');
+            } else {
+              showToast('✅ تم إضافة الصورة لمعرض أعمال القطاع بنجاح!', 'success');
+            }
           }
         }
       }
     } catch (error) {
       console.error(error);
-      showToast('❌ حدث خطأ أثناء معالجة الصورة، يرجى التأكد من اختيار ملف صورة صحيح وحجم مناسب.', 'error');
+      showToast('❌ حدث خطأ أثناء معالجة الصور، يرجى التأكد من اختيار ملفات صور صالحة.', 'error');
     } finally {
       // تصفير مدخلات الملف لتسهيل رفع نفس الصورة مجدداً إن تطلب الأمر
       e.target.value = '';
@@ -443,21 +463,41 @@ export default function App() {
   };
 
   const handleCustomGalleryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
 
-    showToast('⏳ جاري معالجة وضغط الصورة المرفوعة...', 'info');
+    if (files.length > 1) {
+      showToast(`⏳ جاري معالجة وضغط ${files.length} من الصور المرفوعة دفعة واحدة...`, 'info');
+    } else {
+      showToast('⏳ جاري معالجة وضغط الصورة المرفوعة...', 'info');
+    }
 
     try {
-      const base64Image = await processAndCompressImage(file);
+      const results = await Promise.allSettled(
+        (Array.from(files) as File[]).map(file => processAndCompressImage(file))
+      );
+
+      const base64Images = results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => (r as PromiseFulfilledResult<string>).value);
+
+      if (base64Images.length === 0) {
+        showToast('❌ لم يتم بنجاح معالجة وضغط أي صورة من الملفات المحددة.', 'error');
+        return;
+      }
+
       const updatedPhotos = { ...galleryPhotos };
-      updatedPhotos[activeGalleryTab] = [...updatedPhotos[activeGalleryTab], base64Image];
+      updatedPhotos[activeGalleryTab] = [...updatedPhotos[activeGalleryTab], ...base64Images];
       
       saveGalleryPhotosState(updatedPhotos);
-      showToast('✅ تم إضافة الصورة لمعرض الأعمال بنجاح!', 'success');
+      if (base64Images.length > 1) {
+        showToast(`✅ تم إضافة ${base64Images.length} صور لمعرض الأعمال بنجاح!`, 'success');
+      } else {
+        showToast('✅ تم إضافة الصورة لمعرض الأعمال بنجاح!', 'success');
+      }
     } catch (error) {
       console.error(error);
-      showToast('❌ حدد خطأ أثناء معالجة الصورة، يرجى المحاولة مرة أخرى.', 'error');
+      showToast('❌ حدث خطأ أثناء معالجة الصور، يرجى المحاولة مرة أخرى.', 'error');
     } finally {
       e.target.value = '';
     }
@@ -1889,6 +1929,7 @@ export default function App() {
         ref={galleryFileInputRef} 
         onChange={handleFileChange} 
         accept="image/*" 
+        multiple
         className="hidden" 
       />
       <input 
@@ -1896,6 +1937,7 @@ export default function App() {
         ref={customGalleryInputRef} 
         onChange={handleCustomGalleryFileChange} 
         accept="image/*" 
+        multiple
         className="hidden" 
       />
 

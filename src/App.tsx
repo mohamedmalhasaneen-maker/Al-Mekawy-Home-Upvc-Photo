@@ -89,8 +89,64 @@ export default function App() {
 
   // ---- استرجاع وحفظ البيانات من الخادم و LocalStorage ----
   useEffect(() => {
+    const fetchLatestDataFromServer = async (isInitialCall = false) => {
+      // 1. استرجاع صور المعرض من الخادم
+      try {
+        const res = await fetch('/api/gallery');
+        const json = await res.json();
+        if (json.success && json.data) {
+          setGalleryPhotos(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(json.data)) {
+              return json.data;
+            }
+            return prev;
+          });
+        } else if (isInitialCall) {
+          const savedGalleryPhotos = localStorage.getItem('al_mekawy_three_tab_gallery_v1');
+          if (savedGalleryPhotos) {
+            setGalleryPhotos(JSON.parse(savedGalleryPhotos));
+          }
+        }
+      } catch (e) {
+        if (isInitialCall) {
+          console.error("Error loading gallery from server:", e);
+          const savedGalleryPhotos = localStorage.getItem('al_mekawy_three_tab_gallery_v1');
+          if (savedGalleryPhotos) {
+            setGalleryPhotos(JSON.parse(savedGalleryPhotos));
+          }
+        }
+      }
+
+      // 2. استرجاع الكتالوج من الخادم
+      try {
+        const res = await fetch('/api/catalog');
+        const json = await res.json();
+        if (json.success && json.data) {
+          setCatalog(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(json.data)) {
+              return json.data;
+            }
+            return prev;
+          });
+        } else if (isInitialCall) {
+          const savedCatalog = localStorage.getItem('al_mekawy_catalog_v1');
+          if (savedCatalog) {
+            setCatalog(JSON.parse(savedCatalog));
+          }
+        }
+      } catch (e) {
+        if (isInitialCall) {
+          console.error("Error loading catalog from server:", e);
+          const savedCatalog = localStorage.getItem('al_mekawy_catalog_v1');
+          if (savedCatalog) {
+            setCatalog(JSON.parse(savedCatalog));
+          }
+        }
+      }
+    };
+
     const loadServerAndLocalData = async () => {
-      // 1. استرجاع حالة تسجيل المشرف من الذاكرة المحلية
+      // استرجاع حالة تسجيل المشرف من الذاكرة المحلية
       try {
         const savedAdminState = localStorage.getItem('al_mekawy_admin_logged');
         if (savedAdminState === 'true') {
@@ -100,49 +156,34 @@ export default function App() {
         console.error("Error reading admin state:", e);
       }
 
-      // 2. استرجاع صور المعرض من الخادم، مع استخدام الذاكرة المحلية كبديل
-      try {
-        const res = await fetch('/api/gallery');
-        const json = await res.json();
-        if (json.success && json.data) {
-          setGalleryPhotos(json.data);
-        } else {
-          const savedGalleryPhotos = localStorage.getItem('al_mekawy_three_tab_gallery_v1');
-          if (savedGalleryPhotos) {
-            setGalleryPhotos(JSON.parse(savedGalleryPhotos));
-          }
-        }
-      } catch (e) {
-        console.error("Error loading gallery from server:", e);
-        const savedGalleryPhotos = localStorage.getItem('al_mekawy_three_tab_gallery_v1');
-        if (savedGalleryPhotos) {
-          setGalleryPhotos(JSON.parse(savedGalleryPhotos));
-        }
-      }
-
-      // 3. استرجاع الكتالوج من الخادم، مع استخدام الذاكرة المحلية كبديل
-      try {
-        const res = await fetch('/api/catalog');
-        const json = await res.json();
-        if (json.success && json.data) {
-          setCatalog(json.data);
-        } else {
-          const savedCatalog = localStorage.getItem('al_mekawy_catalog_v1');
-          if (savedCatalog) {
-            setCatalog(JSON.parse(savedCatalog));
-          }
-        }
-      } catch (e) {
-        console.error("Error loading catalog from server:", e);
-        const savedCatalog = localStorage.getItem('al_mekawy_catalog_v1');
-        if (savedCatalog) {
-          setCatalog(JSON.parse(savedCatalog));
-        }
-      }
+      // تحميل البيانات لأول مرة
+      await fetchLatestDataFromServer(true);
     };
 
     loadServerAndLocalData();
+
+    // إعداد فحص دوري ذكي وتلقائي كل 4 ثوانٍ للتأكد من المزامنة الفورية لجميع الزوار
+    const intervalId = setInterval(() => {
+      fetchLatestDataFromServer(false);
+    }, 4000);
+
+    return () => clearInterval(intervalId);
   }, []);
+
+  // مزامنة حالة القطاع المفتوح حالياً عند حدوث أي تعديل للكتالوج قادم من الخادم
+  useEffect(() => {
+    if (selectedSubtype) {
+      for (const category of catalog) {
+        const foundSubtype = category.subtypes.find(s => s.id === selectedSubtype.id);
+        if (foundSubtype) {
+          if (JSON.stringify(foundSubtype) !== JSON.stringify(selectedSubtype)) {
+            setSelectedSubtype(foundSubtype);
+          }
+          break;
+        }
+      }
+    }
+  }, [catalog, selectedSubtype]);
 
   const saveCatalogState = async (newCatalog: CatalogCategory[]) => {
     setCatalog(newCatalog);

@@ -1,0 +1,2120 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Lock, 
+  Unlock, 
+  LogOut, 
+  ArrowRight, 
+  ArrowLeft, 
+  Plus, 
+  Trash2, 
+  Upload, 
+  Image as ImageIcon, 
+  Download, 
+  RefreshCw, 
+  CheckCircle2, 
+  Maximize2, 
+  X, 
+  Phone, 
+  MapPin, 
+  Shield, 
+  Flame, 
+  Wind, 
+  Check,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  MessageCircle,
+  Facebook,
+  Instagram,
+  Video,
+  Calculator,
+  Share2,
+  Copy
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { CatalogCategory, ProductSubtype, Advantage } from './types';
+import { INITIAL_CATALOG, INITIAL_ADVANTAGES, DEFAULT_IMAGES, INITIAL_THREE_TAB_PHOTOS } from './data';
+import { AlmekawyLogo } from './components/AlmekawyLogo';
+
+export default function App() {
+  // ---- الحالات الخاصة بالتطبيق (State Management) ----
+  const [catalog, setCatalog] = useState<CatalogCategory[]>(INITIAL_CATALOG);
+  const [advantages, setAdvantages] = useState<Advantage[]>(INITIAL_ADVANTAGES);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<'doors' | 'windows' | null>(null);
+  const [selectedSubtype, setSelectedSubtype] = useState<ProductSubtype | null>(null);
+  
+  // فئة معرض الصور الثلاثية المضافة حديثاً
+  const [activeGalleryTab, setActiveGalleryTab] = useState<'doors' | 'windows' | 'balconies'>('doors');
+  const [selectedSectionView, setSelectedSectionView] = useState<'doors' | 'windows' | 'balconies' | null>(null);
+  const [galleryPhotos, setGalleryPhotos] = useState<{
+    doors: string[];
+    windows: string[];
+    balconies: string[];
+  }>(INITIAL_THREE_TAB_PHOTOS);
+
+  // حالات المشرف (Admin/Supervisor state)
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
+  const [showLoginModal, setShowLoginModal] = useState<boolean>(false);
+  const [passwordInput, setPasswordInput] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [showUploadMenu, setShowUploadMenu] = useState<boolean>(false);
+  
+  // حالات تصفح ومعاينة الصور (Lightbox / Fullscreen Gallery)
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxSource, setLightboxSource] = useState<{
+    type: 'custom' | 'catalog';
+    tab?: 'doors' | 'windows' | 'balconies';
+    categoryId?: string;
+    subtypeId?: string;
+  } | null>(null);
+  
+  // إشعارات التنبيه (Toast Notifications)
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // ملفات الرفع المخفية (Refs for hidden file inputs)
+  const categoryFileInputRef = useRef<HTMLInputElement>(null);
+  const subtypeCoverFileInputRef = useRef<HTMLInputElement>(null);
+  const galleryFileInputRef = useRef<HTMLInputElement>(null);
+  const importFileInputRef = useRef<HTMLInputElement>(null);
+  const customGalleryInputRef = useRef<HTMLInputElement>(null);
+
+  // لحفظ المستهدف الحالي عند الرفع
+  const [uploadContext, setUploadContext] = useState<{
+    type: 'category' | 'subtype-cover' | 'gallery-add';
+    categoryId?: string;
+    subtypeId?: string;
+  } | null>(null);
+
+  // ---- استرجاع وحفظ البيانات من الخادم و LocalStorage ----
+  useEffect(() => {
+    const loadServerAndLocalData = async () => {
+      // 1. استرجاع حالة تسجيل المشرف من الذاكرة المحلية
+      try {
+        const savedAdminState = localStorage.getItem('al_mekawy_admin_logged');
+        if (savedAdminState === 'true') {
+          setIsAdmin(true);
+        }
+      } catch (e) {
+        console.error("Error reading admin state:", e);
+      }
+
+      // 2. استرجاع صور المعرض من الخادم، مع استخدام الذاكرة المحلية كبديل
+      try {
+        const res = await fetch('/api/gallery');
+        const json = await res.json();
+        if (json.success && json.data) {
+          setGalleryPhotos(json.data);
+        } else {
+          const savedGalleryPhotos = localStorage.getItem('al_mekawy_three_tab_gallery_v1');
+          if (savedGalleryPhotos) {
+            setGalleryPhotos(JSON.parse(savedGalleryPhotos));
+          }
+        }
+      } catch (e) {
+        console.error("Error loading gallery from server:", e);
+        const savedGalleryPhotos = localStorage.getItem('al_mekawy_three_tab_gallery_v1');
+        if (savedGalleryPhotos) {
+          setGalleryPhotos(JSON.parse(savedGalleryPhotos));
+        }
+      }
+
+      // 3. استرجاع الكتالوج من الخادم، مع استخدام الذاكرة المحلية كبديل
+      try {
+        const res = await fetch('/api/catalog');
+        const json = await res.json();
+        if (json.success && json.data) {
+          setCatalog(json.data);
+        } else {
+          const savedCatalog = localStorage.getItem('al_mekawy_catalog_v1');
+          if (savedCatalog) {
+            setCatalog(JSON.parse(savedCatalog));
+          }
+        }
+      } catch (e) {
+        console.error("Error loading catalog from server:", e);
+        const savedCatalog = localStorage.getItem('al_mekawy_catalog_v1');
+        if (savedCatalog) {
+          setCatalog(JSON.parse(savedCatalog));
+        }
+      }
+    };
+
+    loadServerAndLocalData();
+  }, []);
+
+  const saveCatalogState = async (newCatalog: CatalogCategory[]) => {
+    setCatalog(newCatalog);
+    try {
+      localStorage.setItem('al_mekawy_catalog_v1', JSON.stringify(newCatalog));
+    } catch (e) {
+      console.error("Error saving to localStorage:", e);
+      showToast('⚠️ تعذر الحفظ التلقائي المحلي: قد تكون مساحة الصور المرفوعة كبيرة جداً.', 'error');
+    }
+
+    try {
+      await fetch('/api/catalog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ catalog: newCatalog })
+      });
+    } catch (e) {
+      console.error("Error saving catalog to server:", e);
+      showToast('⚠️ تعذر حفظ التعديلات على الخادم الرئيسي، تم الحفظ محلياً فقط.', 'error');
+    }
+  };
+
+  const saveGalleryPhotosState = async (newPhotos: { doors: string[]; windows: string[]; balconies: string[] }) => {
+    setGalleryPhotos(newPhotos);
+    try {
+      localStorage.setItem('al_mekawy_three_tab_gallery_v1', JSON.stringify(newPhotos));
+    } catch (e) {
+      console.error("Error saving gallery photos to localStorage:", e);
+      showToast('⚠️ تعذر حفظ الصور الجديدة في الذاكرة التلقائية المحلية.', 'error');
+    }
+
+    try {
+      const res = await fetch('/api/gallery', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ photos: newPhotos })
+      });
+      const json = await res.json();
+      if (json.success) {
+        showToast('✅ تم حفظ الصور ونشرها بنجاح للجميع على الخادم!', 'success');
+      } else {
+        showToast('⚠️ تم الحفظ محلياً وتعذر النشر على الخادم.', 'info');
+      }
+    } catch (e) {
+      console.error("Error saving gallery to server:", e);
+      showToast('⚠️ تعذر حفظ الصور على الخادم الرئيسي، تم الحفظ محلياً فقط.', 'error');
+    }
+  };
+
+  // ---- دالة لعرض الإشعارات اللطيفة ----
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4500);
+  };
+
+  // ---- التعامل مع كلمة مرور المشرف ----
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    // كلمة المرور الافتراضية بسيطة وسهلة الفهم للمستخدم العربي
+    if (passwordInput === '662006' || passwordInput.toLowerCase() === 'admin') {
+      setIsAdmin(true);
+      localStorage.setItem('al_mekawy_admin_logged', 'true');
+      setShowLoginModal(false);
+      setPasswordInput('');
+      setLoginError('');
+      showToast('🔒 تم تسجيل دخول المشرف بنجاح! يمكنك الآن تعديل ورفع أي صور مباشرة.', 'success');
+    } else {
+      setLoginError('كلمة المرور غير صحيحة! يرجى المحاولة مرة أخرى (كلمة المرور: 662006)');
+    }
+  };
+
+  const handleLogout = () => {
+    setIsAdmin(false);
+    localStorage.removeItem('al_mekawy_admin_logged');
+    setShowAdminPanel(false);
+    showToast('🔓 تم تسجيل الخروج من وضع المشرف وتأمين الموقع.', 'info');
+  };
+
+  // ---- مشاركة الصور عبر الشبكات الاجتماعية ونظام نسخ الروابط ----
+  const handleShare = (imgUrl: string, platform: 'whatsapp' | 'facebook' | 'copy', e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    
+    // في حال كانت الصورة عبارة عن Data URL (ترميز base64) نقوم بمشاركة رابط الموقع نفسه
+    const isDataUrl = imgUrl.startsWith('data:');
+    const shareUrl = isDataUrl ? window.location.href : (imgUrl.startsWith('http') ? imgUrl : window.location.origin + imgUrl);
+    const shareText = `شاهد هذا العمل المميز من شركة المكاوي هوم لأعمال الـ UPVC والشبابيك والأبواب:\n${shareUrl}`;
+
+    if (platform === 'whatsapp') {
+      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+      window.open(waUrl, '_blank');
+      showToast('📲 جاري فتح واتساب للمشاركة...', 'success');
+    } else if (platform === 'facebook') {
+      const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+      window.open(fbUrl, '_blank');
+      showToast('🌐 جاري فتح فيسبوك للمشاركة...', 'success');
+    } else if (platform === 'copy') {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        showToast('📋 تم نسخ رابط الصورة بنجاح إلى الحافظة!', 'success');
+      }).catch(() => {
+        showToast('❌ عذراً، لم نتمكن من نسخ الرابط.', 'error');
+      });
+    }
+  };
+
+  // ---- معالجة وضغط الصور على المتصفح (HTML5 Canvas Compression) ----
+  // هذه ميزة احترافية جداً تمنع امتلاء مساحة الـ LocalStorage عن طريق تصغير وضغط الصور المرفوعة تلقائياً
+  const processAndCompressImage = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      if (!file.type.startsWith('image/')) {
+        reject(new Error('الملف المرفوع ليس صورة صالحة!'));
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          let width = img.width;
+          let height = img.height;
+
+          // أقصى أبعاد مسموحة للصور (مثالية للعرض وسريعة التحميل)
+          const MAX_WIDTH = 800;
+          const MAX_HEIGHT = 600;
+
+          if (width > height) {
+            if (width > MAX_WIDTH) {
+              height = Math.round((height * MAX_WIDTH) / width);
+              width = MAX_WIDTH;
+            }
+          } else {
+            if (height > MAX_HEIGHT) {
+              width = Math.round((width * MAX_HEIGHT) / height);
+              height = MAX_HEIGHT;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            reject(new Error('تعذر معالجة محرك الرسم الثنائي الأبعاد'));
+            return;
+          }
+
+          // خلفية بيضاء في حال كانت الصورة شفافة ونريد ضغطها كـ JPEG
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, width, height);
+          
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // تصدير الصورة بجودة مضغوطة 70% للحفاظ على مساحة التخزين وسرعة التصفح
+          const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.7);
+          resolve(compressedDataUrl);
+        };
+        img.onerror = () => reject(new Error('فشل تحميل محتوى الصورة المحددة'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('فشل قراءة الملف من الجهاز'));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // ---- تفعيل رفع الملفات ----
+  const triggerImageUpload = (
+    type: 'category' | 'subtype-cover' | 'gallery-add', 
+    categoryId?: string, 
+    subtypeId?: string
+  ) => {
+    if (!isAdmin) {
+      setShowLoginModal(true);
+      return;
+    }
+    setUploadContext({ type, categoryId, subtypeId });
+    
+    // تأخير طفيف لضمان تحديث الـ context
+    setTimeout(() => {
+      if (type === 'category' && categoryFileInputRef.current) {
+        categoryFileInputRef.current.click();
+      } else if (type === 'subtype-cover' && subtypeCoverFileInputRef.current) {
+        subtypeCoverFileInputRef.current.click();
+      } else if (type === 'gallery-add' && galleryFileInputRef.current) {
+        galleryFileInputRef.current.click();
+      }
+    }, 50);
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadContext) return;
+
+    showToast('⏳ جاري معالجة وضغط الصورة المرفوعة...', 'info');
+
+    try {
+      const base64Image = await processAndCompressImage(file);
+      const updatedCatalog = [...catalog];
+
+      if (uploadContext.type === 'category' && uploadContext.categoryId) {
+        // تحديث صورة القسم الرئيسي (Doors or Windows)
+        const catIdx = updatedCatalog.findIndex(c => c.id === uploadContext.categoryId);
+        if (catIdx !== -1) {
+          updatedCatalog[catIdx].image = base64Image;
+          saveCatalogState(updatedCatalog);
+          showToast('📸 تم تحديث غلاف القسم بنجاح!', 'success');
+        }
+      } 
+      else if (uploadContext.type === 'subtype-cover' && uploadContext.categoryId && uploadContext.subtypeId) {
+        // تحديث صورة الغلاف لقطاع فرعي معين
+        const catIdx = updatedCatalog.findIndex(c => c.id === uploadContext.categoryId);
+        if (catIdx !== -1) {
+          const subIdx = updatedCatalog[catIdx].subtypes.findIndex(s => s.id === uploadContext.subtypeId);
+          if (subIdx !== -1) {
+            updatedCatalog[catIdx].subtypes[subIdx].image = base64Image;
+            
+            // تحديث الضلفة المعروضة حالياً إن وجدت لتحديث فوري
+            if (selectedSubtype && selectedSubtype.id === uploadContext.subtypeId) {
+              setSelectedSubtype({ ...selectedSubtype, image: base64Image });
+            }
+            
+            saveCatalogState(updatedCatalog);
+            showToast('📸 تم تحديث غلاف القطاع بنجاح!', 'success');
+          }
+        }
+      } 
+      else if (uploadContext.type === 'gallery-add' && uploadContext.categoryId && uploadContext.subtypeId) {
+        // إضافة صورة جديدة لمعرض الأعمال المنفذة
+        const catIdx = updatedCatalog.findIndex(c => c.id === uploadContext.categoryId);
+        if (catIdx !== -1) {
+          const subIdx = updatedCatalog[catIdx].subtypes.findIndex(s => s.id === uploadContext.subtypeId);
+          if (subIdx !== -1) {
+            if (!updatedCatalog[catIdx].subtypes[subIdx].gallery) {
+              updatedCatalog[catIdx].subtypes[subIdx].gallery = [];
+            }
+            updatedCatalog[catIdx].subtypes[subIdx].gallery.push(base64Image);
+            
+            // تحديث الضلفة المعروضة حالياً لتحديث فوري للمعرض المفتوح أمام المستخدم
+            if (selectedSubtype && selectedSubtype.id === uploadContext.subtypeId) {
+              setSelectedSubtype({ 
+                ...selectedSubtype, 
+                gallery: [...(selectedSubtype.gallery || []), base64Image] 
+              });
+            }
+
+            saveCatalogState(updatedCatalog);
+            showToast('✅ تم إضافة الصورة لمعرض أعمال القطاع بنجاح!', 'success');
+          }
+        }
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('❌ حدث خطأ أثناء معالجة الصورة، يرجى التأكد من اختيار ملف صورة صحيح وحجم مناسب.', 'error');
+    } finally {
+      // تصفير مدخلات الملف لتسهيل رفع نفس الصورة مجدداً إن تطلب الأمر
+      e.target.value = '';
+      setUploadContext(null);
+    }
+  };
+
+  // ---- حذف صورة من معرض الأعمال ----
+  const handleDeleteGalleryImage = (imageIndex: number, categoryId: string, subtypeId: string) => {
+    if (!isAdmin) {
+      showToast('⚠️ غير مسموح بالحذف إلا للمشرف فقط', 'error');
+      return;
+    }
+    const updatedCatalog = [...catalog];
+    const catIdx = updatedCatalog.findIndex(c => c.id === categoryId);
+    if (catIdx !== -1) {
+      const subIdx = updatedCatalog[catIdx].subtypes.findIndex(s => s.id === subtypeId);
+      if (subIdx !== -1) {
+        updatedCatalog[catIdx].subtypes[subIdx].gallery.splice(imageIndex, 1);
+        
+        // تحديث الواجهة التفاعلية فوراً
+        if (selectedSubtype && selectedSubtype.id === subtypeId) {
+          const newGallery = [...selectedSubtype.gallery];
+          newGallery.splice(imageIndex, 1);
+          setSelectedSubtype({ ...selectedSubtype, gallery: newGallery });
+        }
+
+        saveCatalogState(updatedCatalog);
+        showToast('🗑️ تم حذف الصورة من المعرض بنجاح.', 'success');
+      }
+    }
+  };
+
+  // ---- إدارة وتأمين معرض الصور الحصري الثلاثي الجديد (الأبواب، الشبابيك، البلكونات) ----
+  const triggerCustomGalleryUpload = (tab: 'doors' | 'windows' | 'balconies') => {
+    if (!isAdmin) {
+      setShowLoginModal(true);
+      return;
+    }
+    setActiveGalleryTab(tab);
+    if (customGalleryInputRef.current) {
+      customGalleryInputRef.current.click();
+    }
+  };
+
+  const handleCustomGalleryFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    showToast('⏳ جاري معالجة وضغط الصورة المرفوعة...', 'info');
+
+    try {
+      const base64Image = await processAndCompressImage(file);
+      const updatedPhotos = { ...galleryPhotos };
+      updatedPhotos[activeGalleryTab] = [...updatedPhotos[activeGalleryTab], base64Image];
+      
+      saveGalleryPhotosState(updatedPhotos);
+      showToast('✅ تم إضافة الصورة لمعرض الأعمال بنجاح!', 'success');
+    } catch (error) {
+      console.error(error);
+      showToast('❌ حدد خطأ أثناء معالجة الصورة، يرجى المحاولة مرة أخرى.', 'error');
+    } finally {
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteCustomGalleryImage = (tab: 'doors' | 'windows' | 'balconies', index: number) => {
+    if (!isAdmin) {
+      showToast('⚠️ غير مسموح بالحذف إلا للمشرف فقط', 'error');
+      return;
+    }
+    const updatedPhotos = { ...galleryPhotos };
+    updatedPhotos[tab] = updatedPhotos[tab].filter((_, idx) => idx !== index);
+    saveGalleryPhotosState(updatedPhotos);
+    showToast('🗑️ تم حذف الصورة بنجاح من المعرض.', 'success');
+  };
+
+  // ---- استعادة الإعدادات والكتالوج المصنعي الأصلي ----
+  const handleResetCatalog = async () => {
+    if (confirm('🚨 انتبه! هذا الإجراء سيقوم بحذف جميع الصور والتعديلات التي قام بها المشرف واستعادة صور وعناصر الكتالوج الافتراضية بالكامل. هل تريد الاستمرار؟')) {
+      await saveCatalogState(INITIAL_CATALOG);
+      await saveGalleryPhotosState(INITIAL_THREE_TAB_PHOTOS);
+      localStorage.removeItem('al_mekawy_catalog_v1');
+      localStorage.removeItem('al_mekawy_three_tab_gallery_v1');
+      setSelectedCategoryId(null);
+      setSelectedSubtype(null);
+      showToast('🔄 تم تصفير الكتالوج واستعادة الصور والتكوينات الافتراضية للموقع.', 'info');
+    }
+  };
+
+  // ---- تصدير بيانات الكتالوج بالكامل كملف JSON لتأمينها ----
+  const handleExportData = () => {
+    try {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(catalog, null, 2));
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.setAttribute("href", dataStr);
+      downloadAnchor.setAttribute("download", "Al_Mekawy_UPVC_Catalog_Backup.json");
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      downloadAnchor.remove();
+      showToast('📥 تم تحميل ملف نسخة احتياطية للكتالوج بنجاح! احتفظ به لاستعادته في أي وقت.', 'success');
+    } catch (e) {
+      showToast('❌ تعذر تصدير البيانات للنسخة الاحتياطية.', 'error');
+    }
+  };
+
+  // ---- استيراد بيانات الكتالوج بالكامل من ملف JSON خارجي ----
+  const handleImportClick = () => {
+    if (importFileInputRef.current) {
+      importFileInputRef.current.click();
+    }
+  };
+
+  const handleImportFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const parsed = JSON.parse(event.target?.result as string);
+        if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].subtypes) {
+          saveCatalogState(parsed);
+          setSelectedCategoryId(null);
+          setSelectedSubtype(null);
+          showToast('⚡ تم استيراد وتحميل النسخة الاحتياطية وتحديث كافة الصور والقطاعات بنجاح!', 'success');
+        } else {
+          showToast('❌ بنية ملف النسخ الاحتياطي غير صالحة ولا تتطابق مع كتالوج المكاوي.', 'error');
+        }
+      } catch (err) {
+        showToast('❌ حدث خطأ في قراءة ملف الـ JSON المرفوع.', 'error');
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = ''; // تفريغ المدخل
+  };
+
+  // ---- التنقل السلس بين الأقسام والقطاعات ----
+  const handleSelectCategory = (categoryId: 'doors' | 'windows') => {
+    setSelectedCategoryId(categoryId);
+    setSelectedSubtype(null); // إعادة تعيين أي قطاع مفتوح
+    
+    // سكرول لطيف لأعلى منطقة المنتجات
+    const el = document.getElementById('catalog-explore-section');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  const handleGoBackToMain = () => {
+    setSelectedCategoryId(null);
+    setSelectedSubtype(null);
+  };
+
+  const handleSelectSubtype = (subtype: ProductSubtype) => {
+    setSelectedSubtype(subtype);
+    // فتح معرض الصور الخاص به فوراً للمعاينة
+    const el = document.getElementById('subtype-details-container');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
+  // ---- فتح وعرض نافذة معاينة الصور الكبيرة (Lightbox) ----
+  const openLightbox = (
+    images: string[], 
+    index: number, 
+    source?: {
+      type: 'custom' | 'catalog';
+      tab?: 'doors' | 'windows' | 'balconies';
+      categoryId?: string;
+      subtypeId?: string;
+    }
+  ) => {
+    setLightboxImages(images);
+    setLightboxIndex(index);
+    if (source) {
+      setLightboxSource(source);
+    } else {
+      setLightboxSource(null);
+    }
+  };
+
+  const closeLightbox = () => {
+    setLightboxIndex(null);
+    setLightboxSource(null);
+  };
+
+  const handleDeleteFromLightbox = () => {
+    if (lightboxIndex === null || !lightboxSource) return;
+
+    if (!isAdmin) {
+      showToast('⚠️ غير مسموح بالحذف إلا للمشرف فقط', 'error');
+      return;
+    }
+
+    const { type, tab, categoryId, subtypeId } = lightboxSource;
+    const indexToDelete = lightboxIndex;
+
+    if (type === 'custom' && tab) {
+      const updatedPhotos = { ...galleryPhotos };
+      updatedPhotos[tab] = updatedPhotos[tab].filter((_, idx) => idx !== indexToDelete);
+      
+      const newImages = [...lightboxImages];
+      newImages.splice(indexToDelete, 1);
+      setLightboxImages(newImages);
+
+      saveGalleryPhotosState(updatedPhotos);
+      showToast('🗑️ تم حذف الصورة بنجاح من المعرض.', 'success');
+
+      if (newImages.length === 0) {
+        closeLightbox();
+      } else {
+        setLightboxIndex(Math.min(indexToDelete, newImages.length - 1));
+      }
+    } else if (type === 'catalog' && categoryId && subtypeId) {
+      const updatedCatalog = [...catalog];
+      const catIdx = updatedCatalog.findIndex(c => c.id === categoryId);
+      if (catIdx !== -1) {
+        const subIdx = updatedCatalog[catIdx].subtypes.findIndex(s => s.id === subtypeId);
+        if (subIdx !== -1) {
+          updatedCatalog[catIdx].subtypes[subIdx].gallery.splice(indexToDelete, 1);
+
+          if (selectedSubtype && selectedSubtype.id === subtypeId) {
+            const newGallery = [...selectedSubtype.gallery];
+            newGallery.splice(indexToDelete, 1);
+            setSelectedSubtype({ ...selectedSubtype, gallery: newGallery });
+          }
+
+          const newImages = [...lightboxImages];
+          newImages.splice(indexToDelete, 1);
+          setLightboxImages(newImages);
+
+          saveCatalogState(updatedCatalog);
+          showToast('🗑️ تم حذف الصورة من المعرض بنجاح.', 'success');
+
+          if (newImages.length === 0) {
+            closeLightbox();
+          } else {
+            setLightboxIndex(Math.min(indexToDelete, newImages.length - 1));
+          }
+        }
+      }
+    }
+  };
+
+  const navigateLightbox = (direction: 'next' | 'prev') => {
+    if (lightboxIndex === null || lightboxImages.length <= 1) return;
+    
+    let newIdx = lightboxIndex;
+    if (direction === 'next') {
+      newIdx = (lightboxIndex + 1) % lightboxImages.length;
+    } else {
+      newIdx = (lightboxIndex - 1 + lightboxImages.length) % lightboxImages.length;
+    }
+    setLightboxIndex(newIdx);
+  };
+
+  // القسم المحدد حالياً
+  const currentCategory = catalog.find(c => c.id === selectedCategoryId);
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-800 selection:bg-sky-500 selection:text-white font-sans antialiased pb-20">
+      
+      {/* ---- شريط تنبيهات المشرف العلوي في حال تفعيل وضع التعديل ---- */}
+      {isAdmin && (
+        <div className="sticky top-0 z-50 bg-gradient-to-r from-sky-600 via-sky-700 to-sky-800 text-white shadow-md">
+          <div className="max-w-7xl mx-auto px-4 py-2 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm font-semibold">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 relative">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500"></span>
+              </span>
+              <span>أنت الآن في وضع "المشرف المعتمد" لشركة المكاوى UPVC</span>
+            </div>
+            
+            <div className="flex items-center gap-4 relative">
+              <div className="relative">
+                <button 
+                  onClick={() => setShowUploadMenu(!showUploadMenu)} 
+                  className="bg-white hover:bg-sky-50 text-sky-700 font-extrabold text-xs px-3 py-1.5 rounded-lg transition-all duration-200 cursor-pointer flex items-center gap-1 shadow-sm hover:scale-102 active:scale-98"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>رفع صورة جديدة للموقع 📤</span>
+                </button>
+
+                <AnimatePresence>
+                  {showUploadMenu && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-slate-200 z-50 overflow-hidden text-slate-800"
+                    >
+                      <div className="p-2 border-b border-slate-100 bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider text-right">
+                        اختر المعرض المراد الرفع إليه:
+                      </div>
+                      <div className="flex flex-col p-1.5 gap-1 text-right font-sans">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUploadMenu(false);
+                            triggerCustomGalleryUpload('doors');
+                          }}
+                          className="w-full text-right px-3 py-2 rounded-lg text-xs font-bold hover:bg-sky-50 hover:text-sky-700 transition-colors cursor-pointer flex items-center justify-between"
+                        >
+                          <span>🚪 معرض الأبواب الـ PVC</span>
+                          <span className="text-[10px] text-slate-400 font-mono">({galleryPhotos.doors.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUploadMenu(false);
+                            triggerCustomGalleryUpload('windows');
+                          }}
+                          className="w-full text-right px-3 py-2 rounded-lg text-xs font-bold hover:bg-sky-50 hover:text-sky-700 transition-colors cursor-pointer flex items-center justify-between"
+                        >
+                          <span>🪟 معرض الشبابيك الـ PVC</span>
+                          <span className="text-[10px] text-slate-400 font-mono">({galleryPhotos.windows.length})</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowUploadMenu(false);
+                            triggerCustomGalleryUpload('balconies');
+                          }}
+                          className="w-full text-right px-3 py-2 rounded-lg text-xs font-bold hover:bg-sky-50 hover:text-sky-700 transition-colors cursor-pointer flex items-center justify-between"
+                        >
+                          <span> balkon معرض البلكونات</span>
+                          <span className="text-[10px] text-slate-400 font-mono">({galleryPhotos.balconies.length})</span>
+                        </button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <button 
+                onClick={() => setShowAdminPanel(!showAdminPanel)} 
+                className="bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-xs cursor-pointer transition-colors"
+                title="لوحة البيانات والنسخ الاحتياطي"
+              >
+                ⚙️ الإعدادات
+              </button>
+              
+              <button 
+                onClick={handleLogout} 
+                className="flex items-center gap-1 bg-red-600 hover:bg-red-700 px-3 py-1 rounded text-white cursor-pointer transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>خروج المشرف</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ---- لوحة تحكم المشرف لإدارة وتأمين الصور وقاعدة البيانات ---- */}
+      <AnimatePresence>
+        {isAdmin && showAdminPanel && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-white border-b border-sky-100 shadow-inner overflow-hidden"
+          >
+            <div className="max-w-7xl mx-auto px-4 py-6">
+              <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+                <Building2 className="text-sky-600 w-5 h-5" />
+                لوحة تحكم وتأمين صور كتالوج المكاوى UPVC
+              </h3>
+              <p className="text-sm text-slate-600 mb-6 leading-relaxed">
+                بصفتك المشرف، يمكنك تغيير أي صورة في هذا الموقع مباشرة بضغط زر الماوس فوقها ورفع صور من معرض أعمالك المنفذة بالقطاعات الجرارة والشبابيك التركية والألمانية. نوصي بتأمين البيانات عبر تنزيل نسخة احتياطية من جهازك لاستعادتها أو مشاركتها.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* 1. التصدير */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
+                  <h4 className="font-bold text-sm text-slate-900 mb-2 flex items-center gap-1.5">
+                    <Download className="w-4 h-4 text-sky-600" />
+                    تنزيل نسخة احتياطية (تصدير)
+                  </h4>
+                  <p className="text-xs text-slate-500 mb-3">
+                    تحميل كافة تعديلاتك وصور أعمالك التي رفعتها في ملف واحد لحمايتها من الضياع في حال مسح ذاكرة المتصفح.
+                  </p>
+                  <button 
+                    onClick={handleExportData}
+                    className="w-full bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors cursor-pointer"
+                  >
+                    تصدير الكتالوج بالكامل كـ JSON
+                  </button>
+                </div>
+
+                {/* 2. الاستيراد */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:border-sky-300 transition-colors">
+                  <h4 className="font-bold text-sm text-slate-900 mb-2 flex items-center gap-1.5">
+                    <Upload className="w-4 h-4 text-sky-600" />
+                    تحميل واستعادة نسخة احتياطية (استيراد)
+                  </h4>
+                  <p className="text-xs text-slate-500 mb-3">
+                    استيراد ملف كتالوج خارجي واسترجاع كافة صور أعمالك وقوائمك التي قمت بإنشائها مسبقاً وتعديلها.
+                  </p>
+                  <button 
+                    onClick={handleImportClick}
+                    className="w-full bg-slate-800 hover:bg-slate-900 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors cursor-pointer"
+                  >
+                    استيراد ملف كتالوج JSON
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={importFileInputRef} 
+                    onChange={handleImportFileChange} 
+                    accept=".json" 
+                    className="hidden" 
+                  />
+                </div>
+
+                {/* 3. استعادة الافتراضي */}
+                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 hover:border-red-200 transition-colors">
+                  <h4 className="font-bold text-sm text-slate-900 mb-2 flex items-center gap-1.5">
+                    <RefreshCw className="w-4 h-4 text-red-500" />
+                    تصفير واستعادة المصنع
+                  </h4>
+                  <p className="text-xs text-slate-500 mb-3">
+                    حذف كافة صور المعارض والمشاريع التي قمت برفعها بشكل دائم واسترجاع الرسوم المخططة الافتراضية للكتالوج.
+                  </p>
+                  <button 
+                    onClick={handleResetCatalog}
+                    className="w-full bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 text-xs font-bold py-2 px-3 rounded-lg transition-colors cursor-pointer"
+                  >
+                    استعادة الكتالوج الافتراضي ⚠️
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ---- شريط التواصل العلوي الرفيع والفاخر (Top Contact & Social Bar) ---- */}
+      <div className="bg-slate-900 text-slate-300 border-b border-slate-800 text-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex flex-col sm:flex-row items-center justify-between gap-3">
+          {/* أرقام الهواتف والواتساب */}
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
+            <div className="flex items-center gap-1.5">
+              <Phone className="w-3.5 h-3.5 text-sky-400" />
+              <span className="text-slate-400 font-medium">اتصل بنا:</span>
+              <a href="tel:+201060524985" className="hover:text-white transition-colors font-mono">01060524985</a>
+              <span className="text-slate-700">|</span>
+              <a href="tel:+201141761261" className="hover:text-white transition-colors font-mono">01141761261</a>
+            </div>
+            <span className="hidden md:inline text-slate-700">•</span>
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+              <a 
+                href="https://wa.me/201141761261" 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="hover:text-emerald-400 transition-colors font-bold font-mono"
+              >
+                واتساب: 01141761261
+              </a>
+            </div>
+          </div>
+
+          {/* روابط شبكات التواصل الاجتماعي الفاخرة */}
+          <div className="flex items-center gap-4">
+            <span className="text-slate-500 hidden sm:inline">تابعنا على:</span>
+            <div className="flex items-center gap-3">
+              <a 
+                href="https://web.facebook.com/almekawy.home?rdid=xIM9V6v8VmepuEBu&share_url=https%3A%2F%2Fweb.facebook.com%2Fshare%2F1Bfwi9XFow%2F%3F_rdc%3D1%26_rdr#" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-blue-500 transition-colors p-1 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center justify-center"
+                title="فيسبوك المكاوي"
+              >
+                <Facebook className="w-3.5 h-3.5" />
+              </a>
+              <a 
+                href="https://www.instagram.com/almekawy.home?igsh=bXBqZmw3NGt4bzVs" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-pink-500 transition-colors p-1 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center justify-center"
+                title="إنستغرام المكاوي"
+              >
+                <Instagram className="w-3.5 h-3.5" />
+              </a>
+              <a 
+                href="https://www.tiktok.com/@almekawy.home?_r=1&_t=ZS-971BmNPuWbk" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="hover:text-rose-400 transition-colors px-2 py-0.5 bg-slate-800 rounded-lg hover:bg-slate-700 flex items-center gap-1 text-[10px] font-bold"
+                title="تيك توك المكاوي"
+              >
+                <Video className="w-3 h-3 text-rose-500" />
+                <span>TikTok</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ---- الهيدر الرئيسي الفاخر (Modern Navbar) ---- */}
+      <header className="bg-white border-b border-slate-200/80 sticky top-0 z-30 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
+          
+          {/* الشعار المبتكر */}
+          <div 
+            onClick={() => setSelectedSectionView(null)}
+            className="flex items-center gap-3 cursor-pointer hover:opacity-85 transition-opacity"
+            title="العودة للصفحة الرئيسية"
+          >
+            <AlmekawyLogo size="md" variant="dark" showText={false} />
+            <div>
+              <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                <span>المكاوي هوم</span>
+                <span className="text-sky-600 font-bold text-sm sm:text-base px-2 py-0.5 bg-sky-50 rounded-lg border border-sky-100 font-mono">UPVC</span>
+              </h1>
+              <p className="text-[10px] sm:text-xs text-slate-500 font-medium tracking-wide">AL-MEKAWY HOME UPVC PHOTO</p>
+            </div>
+          </div>
+
+          {/* معلومات التواصل السريع والمشرف */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* رابط عمل عروض الأسعار الجديد والفاخر */}
+            <a 
+              href="https://al-mekawy-home.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 sm:gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-extrabold px-3 py-2.5 sm:px-4 sm:py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-sky-600/15 cursor-pointer border border-sky-500 hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <Calculator className="w-4 h-4 text-sky-100" />
+              <span>عمل عروض الأسعار</span>
+            </a>
+
+            {/* زر واتساب السريع المميز */}
+            <a 
+              href="https://wa.me/201141761261"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-extrabold px-3.5 py-2.5 rounded-xl transition-all duration-300 shadow-md shadow-emerald-500/10 cursor-pointer"
+            >
+              <MessageCircle className="w-4 h-4 animate-bounce" />
+              <span>راسلنا الآن</span>
+            </a>
+
+            {!isAdmin ? (
+              <button 
+                onClick={() => setShowLoginModal(true)}
+                className="flex items-center gap-1.5 bg-slate-900 hover:bg-sky-600 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-300 shadow-sm cursor-pointer"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span className="hidden xs:inline">دخول المشرف</span>
+              </button>
+            ) : (
+              <button 
+                onClick={() => setShowAdminPanel(!showAdminPanel)}
+                className="flex items-center gap-1.5 bg-sky-50 hover:bg-sky-100 text-sky-600 text-xs font-bold px-4 py-2.5 rounded-xl transition-all duration-300 border border-sky-150 cursor-pointer"
+              >
+                <Unlock className="w-3.5 h-3.5" />
+                <span>لوحة الصور</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {selectedSectionView === null ? (
+        <>
+          {/* ---- واجهة البانر الإعلاني الفاخر (Elegant Hero Section) ---- */}
+          <section className="relative overflow-hidden bg-gradient-to-b from-white to-slate-50 border-b border-slate-200/50 py-12 sm:py-16">
+            <div className="absolute inset-0 bg-[radial-gradient(#e2e8f0_1px,transparent_1px)] [background-size:16px_16px] opacity-60"></div>
+            <div className="max-w-4xl mx-auto text-center px-4 relative z-10">
+              <span className="inline-flex items-center gap-1.5 bg-sky-50 text-sky-700 text-xs font-extrabold px-3 py-1.5 rounded-full border border-sky-100/80 mb-4 animate-pulse">
+                ✨ كمال العزل وقمة الأناقة والأمان
+              </span>
+              <h2 className="text-3xl sm:text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight mb-4">
+                كتالوج أعمال <span className="text-sky-600">أبواب وشبابيك الـ PVC</span>
+              </h2>
+              <p className="text-slate-600 text-sm sm:text-base max-w-2xl mx-auto leading-relaxed mb-6">
+                مجموعة المكاوي الرائدة تقدم لكم قطاعات معززة بحديد التسليح المجلفن لمقاومة الأتربة، وعزل الصوت والحرارة بجدارة فائقة مع صور حقيقية من مشاريعنا المنفذة.
+              </p>
+              <div className="flex justify-center items-center gap-6 text-xs sm:text-sm font-semibold text-slate-500">
+                <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200/80 shadow-xs">
+                  <Check className="text-sky-500 w-4 h-4" /> عزل كامل للغبار والأتربة
+                </span>
+                <span className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-lg border border-slate-200/80 shadow-xs">
+                  <Check className="text-sky-500 w-4 h-4" /> ضمان معتمد 10 سنوات
+                </span>
+              </div>
+            </div>
+          </section>
+
+          {/* ---- قسم البنود الثلاثة الرئيسي للمكاوي UPVC ---- */}
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+            <div className="text-center mb-10">
+              <span className="text-xs font-bold text-sky-600 tracking-wider uppercase font-mono px-3 py-1 bg-sky-50 rounded-full">🔖 أقسام الكتالوج الرئيسية</span>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight mt-3">
+                تصفح فئات أعمالنا الحية ومشاريعنا
+              </h3>
+              <p className="text-slate-500 text-xs sm:text-sm mt-2">
+                اضغط على أي بند من البنود التالية للانتقال الفوري إلى معرض الصور والمشاريع الخاصة به
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
+              
+              {/* 1. الأبواب */}
+              <div 
+                onClick={() => {
+                  setActiveGalleryTab('doors');
+                  setSelectedSectionView('doors');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="group relative bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <div className="absolute top-4 right-4 z-10 bg-slate-900/85 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-xs flex items-center gap-1.5">
+                  <span>🚪 أبواب الـ PVC</span>
+                </div>
+                <div className="aspect-[16/10] sm:aspect-video overflow-hidden bg-slate-900">
+                  <img 
+                    src={DEFAULT_IMAGES.doorsCover} 
+                    alt="الأبواب" 
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                  />
+                </div>
+                <div className="p-5 sm:p-6">
+                  <h4 className="text-lg font-extrabold text-slate-900 group-hover:text-sky-600 transition-colors font-sans">أبواب الـ PVC الفخمة</h4>
+                  <p className="text-slate-500 text-xs sm:text-sm mt-2 leading-relaxed font-sans">
+                    أبواب داخلية وخارجية ممتازة وعازلة للحرارة والماء، مع قطاعات جرار ومفصلي تناسب الفلل والشقق والقصور.
+                  </p>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-sky-600">
+                    <span className="font-sans">تصفح معرض الصور والأعمال</span>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-50 group-hover:bg-sky-100 transition-colors">
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. الشبابيك */}
+              <div 
+                onClick={() => {
+                  setActiveGalleryTab('windows');
+                  setSelectedSectionView('windows');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="group relative bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <div className="absolute top-4 right-4 z-10 bg-slate-900/85 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-xs flex items-center gap-1.5">
+                  <span>🪟 شبابيك الـ PVC</span>
+                </div>
+                <div className="aspect-[16/10] sm:aspect-video overflow-hidden bg-slate-900">
+                  <img 
+                    src={DEFAULT_IMAGES.windowsCover} 
+                    alt="الشبابيك" 
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                  />
+                </div>
+                <div className="p-5 sm:p-6">
+                  <h4 className="text-lg font-extrabold text-slate-900 group-hover:text-sky-600 transition-colors font-sans">شبابيك الـ PVC المانعة للغبار</h4>
+                  <p className="text-slate-500 text-xs sm:text-sm mt-2 leading-relaxed font-sans">
+                    شبابيك دبل جلاس عازلة للضوضاء والأتربة بالكامل بقطاعات ألمانية وتركية مع تسليح حديد مجلفن داخلي.
+                  </p>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-sky-600">
+                    <span className="font-sans">تصفح معرض الصور والأعمال</span>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-50 group-hover:bg-sky-100 transition-colors">
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 3. البلكونات */}
+              <div 
+                onClick={() => {
+                  setActiveGalleryTab('balconies');
+                  setSelectedSectionView('balconies');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                className="group relative bg-white rounded-3xl border border-slate-200/80 overflow-hidden shadow-xs hover:shadow-xl transition-all duration-300 cursor-pointer hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <div className="absolute top-4 right-4 z-10 bg-slate-900/85 text-white text-xs font-bold px-3 py-1.5 rounded-full backdrop-blur-xs flex items-center gap-1.5 font-sans">
+                  <span> balcon بلكونات الـ PVC</span>
+                </div>
+                <div className="aspect-[16/10] sm:aspect-video overflow-hidden bg-slate-900">
+                  <img 
+                    src={INITIAL_THREE_TAB_PHOTOS.balconies[0]} 
+                    alt="البلكونات" 
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 opacity-90"
+                  />
+                </div>
+                <div className="p-5 sm:p-6">
+                  <h4 className="text-lg font-extrabold text-slate-900 group-hover:text-sky-600 transition-colors font-sans">تقفيل بلكونات الـ PVC</h4>
+                  <p className="text-slate-500 text-xs sm:text-sm mt-2 leading-relaxed font-sans">
+                    تصاميم حصرية لإحكام إغلاق وتقفيل الشرفات والبلكونات بمساحات واسعة لتوفير الهدوء التام والجمال المعماري العصري.
+                  </p>
+                  <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-sky-600">
+                    <span className="font-sans">تصفح معرض الصور والأعمال</span>
+                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-sky-50 group-hover:bg-sky-100 transition-colors">
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </section>
+
+        </>
+      ) : (
+        /* Render separate sub-page for selectedSectionView */
+        <motion.div
+          key="selected-subpage"
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -15 }}
+          transition={{ duration: 0.3 }}
+          className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10"
+        >
+          {/* Back button and navigation header */}
+          <div className="mb-8 flex items-center justify-between gap-6 flex-wrap border-b border-slate-200 pb-6">
+            <div>
+              <div className="flex items-center gap-2 text-xs font-bold text-sky-600 uppercase font-mono mb-2">
+                <span>📁 معرض صور الأعمال الحية</span>
+                <span>/</span>
+                <span className="bg-sky-50 px-2 py-0.5 rounded text-[10px]">
+                  {selectedSectionView === 'doors' ? 'الأبواب الـ PVC' : selectedSectionView === 'windows' ? 'الشبابيك الـ PVC' : 'تقفيل البلكونات'}
+                </span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                {selectedSectionView === 'doors' 
+                  ? 'معرض أبواب الـ PVC الفاخرة' 
+                  : selectedSectionView === 'windows' 
+                    ? 'معرض شبابيك الـ PVC المانعة للغبار والضوضاء' 
+                    : 'معرض تقفيل بلكونات وشرفات الـ PVC'
+                }
+              </h2>
+              <p className="text-xs sm:text-sm text-slate-500 mt-2 leading-relaxed max-w-3xl">
+                {selectedSectionView === 'doors'
+                  ? 'تصاميم راقية للأبواب الداخلية والخارجية والجرارة والمفصلية المصنوعة من أجود قطاعات الـ PVC المقاومة للماء والحرارة وعوامل الرطوبة.'
+                  : selectedSectionView === 'windows'
+                    ? 'لقطات حية من مواقع تركيب الشبابيك دبل جلاس العازلة تماماً للأتربة والضوضاء بقطاعات ألمانية وتركية مسلحة من الداخل بالحديد المجلفن.'
+                    : 'حلول عملية ومبتكرة لتقفيل الشرفات والبلكونات بمساحات زجاجية واسعة توفر الجمال المعماري والهدوء التام والوقاية من المطر والغبار.'
+                }
+              </p>
+            </div>
+
+            <button
+              onClick={() => setSelectedSectionView(null)}
+              className="flex items-center gap-2 bg-slate-900 hover:bg-sky-600 text-white font-extrabold text-xs sm:text-sm px-5 py-3 rounded-2xl shadow-md hover:shadow-lg transition-all duration-200 cursor-pointer hover:scale-102 active:scale-98 animate-fade-in"
+            >
+              <ArrowRight className="w-4 h-4" />
+              <span>العودة للرئيسية</span>
+            </button>
+          </div>
+
+          {/* محتوى المعرض المنفصل للبند المحدد */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden p-6 sm:p-8">
+            <div className="flex items-center justify-between gap-4 border-b border-slate-100 pb-4 mb-6 flex-wrap">
+              <div>
+                <h4 className="font-extrabold text-slate-900 text-lg flex items-center gap-2 font-sans">
+                  <span className="p-1.5 bg-sky-50 rounded-lg text-sky-600">★</span>
+                  <span>اللقطات الحية والمشاريع المنفذة ({galleryPhotos[selectedSectionView]?.length || 0})</span>
+                </h4>
+                <p className="text-xs text-slate-500 mt-1">
+                  انقر فوق أي لقطة لتكبيرها وتصفح كامل الصور بجودة فائقة
+                </p>
+              </div>
+
+              {/* زر إضافة صور جديدة للمشرف */}
+              <button
+                type="button"
+                onClick={() => triggerCustomGalleryUpload(selectedSectionView)}
+                className={`flex items-center gap-1.5 text-xs font-bold py-2.5 px-4 rounded-xl transition-all hover:scale-102 cursor-pointer shadow-xs font-sans ${
+                  isAdmin
+                    ? 'bg-sky-600 hover:bg-sky-700 text-white'
+                    : 'bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-600 border border-slate-200'
+                }`}
+              >
+                <Plus className="w-4 h-4" />
+                <span>إضافة لقطة للمشروع {isAdmin ? '(تحميل فوري للمشرف)' : ''}</span>
+              </button>
+            </div>
+
+            {/* شبكة صور المعرض للبند */}
+            {galleryPhotos[selectedSectionView] && galleryPhotos[selectedSectionView].length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+                {galleryPhotos[selectedSectionView].map((img, index) => (
+                  <div
+                    key={index}
+                    onClick={() => openLightbox(galleryPhotos[selectedSectionView], index, { type: 'custom', tab: selectedSectionView })}
+                    className="group/gallery-item relative aspect-[4/3] rounded-2xl overflow-hidden bg-slate-900 border border-slate-100 shadow-sm hover:shadow-lg cursor-zoom-in transition-all duration-300"
+                  >
+                    <img
+                      src={img}
+                      alt={`Project shot ${index + 1}`}
+                      referrerPolicy="no-referrer"
+                      className="w-full h-full object-cover group-hover/gallery-item:scale-105 transition-all duration-500"
+                    />
+                    <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover/gallery-item:opacity-100 transition-opacity flex flex-col items-center justify-between p-4" id={`gallery-item-overlay-${index}`}>
+                      <div className="w-full"></div>
+                      <div className="bg-white/10 backdrop-blur-md p-3 rounded-full text-white hover:scale-110 transition-transform duration-200">
+                        <Maximize2 className="w-5 h-5 drop-shadow-md" />
+                      </div>
+                      
+                      {/* أزرار المشاركة السريعة */}
+                      <div 
+                        className="flex items-center gap-2 bg-slate-900/95 border border-slate-700/50 px-3 py-1.5 rounded-2xl shadow-lg" 
+                        onClick={(e) => e.stopPropagation()}
+                        id={`gallery-item-share-${index}`}
+                      >
+                        <span className="text-[10px] text-slate-300 font-bold font-sans">مشاركة:</span>
+                        <button 
+                          onClick={(e) => handleShare(img, 'whatsapp', e)}
+                          className="p-1 hover:bg-emerald-600/20 text-emerald-400 rounded-full transition-colors cursor-pointer"
+                          title="مشاركة عبر واتساب"
+                        >
+                          <MessageCircle className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={(e) => handleShare(img, 'facebook', e)}
+                          className="p-1 hover:bg-blue-600/20 text-blue-400 rounded-full transition-colors cursor-pointer"
+                          title="مشاركة عبر فيسبوك"
+                        >
+                          <Facebook className="w-3.5 h-3.5" />
+                        </button>
+                        <button 
+                          onClick={(e) => handleShare(img, 'copy', e)}
+                          className="p-1 hover:bg-slate-700 text-slate-300 rounded-full transition-colors cursor-pointer"
+                          title="نسخ رابط الصورة"
+                        >
+                          <Copy className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* زر حذف الصورة للمشرف فقط في حالة التعديل */}
+                    {isAdmin && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCustomGalleryImage(selectedSectionView, index);
+                        }}
+                        className="absolute bottom-3 left-3 bg-red-600/90 hover:bg-red-700 text-white p-2.5 rounded-xl shadow-md hover:scale-110 transition-all duration-200 cursor-pointer z-10 border border-red-500 hover:bg-red-500 animate-fade-in"
+                        title="حذف الصورة نهائياً من المعرض"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate-50 rounded-2xl p-12 text-center border-2 border-dashed border-slate-200 max-w-lg mx-auto font-sans">
+                <ImageIcon className="w-12 h-12 text-slate-400 mx-auto mb-3" />
+                <p className="text-base font-bold text-slate-700">لا توجد صور مخصصة بعد</p>
+                <p className="text-xs text-slate-500 mt-1 mb-6">يرجى من المشرف تسجيل الدخول ورفع صور حية من المعرض</p>
+                <button
+                  type="button"
+                  onClick={() => triggerCustomGalleryUpload(selectedSectionView)}
+                  className="bg-white hover:bg-slate-100 text-sky-600 border border-slate-200 text-xs font-bold py-2.5 px-4 rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>رفع أول صورة الآن</span>
+                </button>
+              </div>
+            )}
+
+            {/* تلميح ذكي للمشرف */}
+            {isAdmin && (
+              <div className="mt-6 bg-sky-50 text-sky-800 p-4 rounded-2xl border border-sky-100 text-xs sm:text-sm flex items-center gap-2">
+                <span>💡</span>
+                <span><strong>لوحة المشرف النشطة:</strong> يمكنك الضغط على أي صورة لعرضها بالحجم الكامل، أو الضغط على "إضافة لقطة للمشروع" لرفع صور حية ومباشرة من هاتفك المحمول أو جهازك وتحديث المعرض فوراً!</span>
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ---- الهيكل الهرمي التفاعلي للكتالوج (Doors vs Windows Selectors) ---- */}
+      {false && (
+      <main id="catalog-explore-section" className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        
+        {/* شريط الإرجاع والتنقل في المستويات الفرعية */}
+        <div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h3 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
+              📂 تصفح الفئات الرئيسية
+              {selectedCategoryId && (
+                <span className="text-sky-600 text-sm sm:text-lg font-medium flex items-center gap-1.5">
+                  <span className="text-slate-300">/</span>
+                  {selectedCategoryId === 'doors' ? 'أبواب PVC' : 'شبابيك PVC'}
+                </span>
+              )}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              {selectedCategoryId 
+                ? 'اضغط على أي قطاع بالأسفل لمشاهدة الميزات الفنية ومعرض الأعمال ومشاريع المشرف'
+                : 'اختر إحدى الفئتين الأساسيتين لبدء استكشاف التصاميم والقطاعات ومشاريعنا المعززة'
+              }
+            </p>
+          </div>
+
+          {/* زر الرجوع للرئيسية - شرطي الظهور */}
+          {selectedCategoryId && (
+            <button
+              onClick={handleGoBackToMain}
+              className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 hover:text-slate-950 text-xs sm:text-sm font-bold px-4 py-2.5 rounded-xl border border-slate-250 shadow-xs transition-all cursor-pointer"
+            >
+              <ArrowRight className="w-4 h-4" />
+              <span>العودة للقائمة الرئيسية</span>
+            </button>
+          )}
+        </div>
+
+        {/* ---- القائمة الرئيسية ثنائية القسم (الأبواب والشبابيك) ---- */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          
+          {/* قسم الأبواب */}
+          <div 
+            onClick={() => handleSelectCategory('doors')}
+            className={`group relative bg-white rounded-3xl overflow-hidden border transition-all duration-500 cursor-pointer shadow-sm hover:shadow-xl ${
+              selectedCategoryId === null 
+                ? 'scale-100 opacity-100 block' 
+                : selectedCategoryId === 'doors' 
+                  ? 'border-sky-500 ring-2 ring-sky-500/20 block md:col-span-2' 
+                  : 'hidden'
+            }`}
+          >
+            <div className="relative aspect-video sm:aspect-3/2 md:aspect-2/1 overflow-hidden bg-slate-900">
+              <img 
+                src={catalog.find(c => c.id === 'doors')?.image} 
+                alt="Doors Section Cover" 
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent flex flex-col justify-end p-6 sm:p-8">
+                <span className="text-xs font-bold text-sky-400 font-mono tracking-widest uppercase mb-1">SECTION DOORS</span>
+                <h4 className="text-2xl sm:text-3xl font-extrabold text-white">قسم الأبواب الـ PVC الفخمة</h4>
+                <p className="text-slate-300 text-xs sm:text-sm mt-1.5 max-w-xl leading-relaxed">
+                  {catalog.find(c => c.id === 'doors')?.description}
+                </p>
+              </div>
+
+              {/* زر تعديل غلاف القسم للمشرف */}
+              {isAdmin && selectedCategoryId === null && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerImageUpload('category', 'doors');
+                  }}
+                  className="absolute top-4 right-4 bg-sky-600/90 hover:bg-sky-600 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1.5 shadow-md backdrop-blur-xs transition-transform hover:scale-105 cursor-pointer z-20"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>تعديل غلاف الأبواب</span>
+                </button>
+              )}
+            </div>
+            
+            {/* مؤشر تفاعلي لطيف */}
+            {selectedCategoryId === null && (
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-slate-600 group-hover:text-sky-600 transition-colors">
+                <span>تصفح قطاعات الأبواب (جرار ومفصلي)...</span>
+                <span className="flex items-center gap-1">
+                  عرض الكتالوج <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* قسم الشبابيك */}
+          <div 
+            onClick={() => handleSelectCategory('windows')}
+            className={`group relative bg-white rounded-3xl overflow-hidden border transition-all duration-500 cursor-pointer shadow-sm hover:shadow-xl ${
+              selectedCategoryId === null 
+                ? 'scale-100 opacity-100 block' 
+                : selectedCategoryId === 'windows' 
+                  ? 'border-sky-500 ring-2 ring-sky-500/20 block md:col-span-2' 
+                  : 'hidden'
+            }`}
+          >
+            <div className="relative aspect-video sm:aspect-3/2 md:aspect-2/1 overflow-hidden bg-slate-900">
+              <img 
+                src={catalog.find(c => c.id === 'windows')?.image} 
+                alt="Windows Section Cover" 
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700 opacity-90"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-900/40 to-transparent flex flex-col justify-end p-6 sm:p-8">
+                <span className="text-xs font-bold text-sky-400 font-mono tracking-widest uppercase mb-1">SECTION WINDOWS</span>
+                <h4 className="text-2xl sm:text-3xl font-extrabold text-white">قسم الشبابيك الـ PVC المقاومة للعزل</h4>
+                <p className="text-slate-300 text-xs sm:text-sm mt-1.5 max-w-xl leading-relaxed">
+                  {catalog.find(c => c.id === 'windows')?.description}
+                </p>
+              </div>
+
+              {/* زر تعديل غلاف القسم للمشرف */}
+              {isAdmin && selectedCategoryId === null && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    triggerImageUpload('category', 'windows');
+                  }}
+                  className="absolute top-4 right-4 bg-sky-600/90 hover:bg-sky-600 text-white text-xs font-bold py-2 px-3 rounded-xl flex items-center gap-1.5 shadow-md backdrop-blur-xs transition-transform hover:scale-105 cursor-pointer z-20"
+                >
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>تعديل غلاف الشبابيك</span>
+                </button>
+              )}
+            </div>
+
+            {/* مؤشر تفاعلي لطيف */}
+            {selectedCategoryId === null && (
+              <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm font-bold text-slate-600 group-hover:text-sky-600 transition-colors">
+                <span>تصفح قطاعات الشبابيك (ألماني وتركي)...</span>
+                <span className="flex items-center gap-1">
+                  عرض الكتالوج <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* ---- القوائم الفرعية لقطاعات الأبواب/الشبابيك (Subtypes Grid) ---- */}
+        <AnimatePresence>
+          {selectedCategoryId && currentCategory && (
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 15 }}
+              transition={{ duration: 0.4 }}
+              className="mt-6"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h4 className="text-lg sm:text-xl font-bold text-slate-900 flex items-center gap-2">
+                  <span className="p-1.5 bg-sky-50 rounded-lg text-sky-600">★</span>
+                  <span>القطاعات المتوفرة للـ {currentCategory.title}</span>
+                </h4>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {currentCategory.subtypes.map((subtype) => {
+                  const isSelected = selectedSubtype?.id === subtype.id;
+                  return (
+                    <div
+                      key={subtype.id}
+                      onClick={() => handleSelectSubtype(subtype)}
+                      className={`group bg-white rounded-2xl overflow-hidden border shadow-xs hover:shadow-lg transition-all duration-300 cursor-pointer ${
+                        isSelected 
+                          ? 'border-sky-500 ring-4 ring-sky-500/15' 
+                          : 'border-slate-200 hover:border-slate-350'
+                      }`}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-5 h-full">
+                        
+                        {/* صورة القطاع التوضيحية */}
+                        <div className="relative sm:col-span-2 h-48 sm:h-full bg-slate-900 overflow-hidden">
+                          <img 
+                            src={subtype.image} 
+                            alt={subtype.name} 
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover:scale-103 transition-transform duration-500"
+                          />
+                          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-transparent to-transparent sm:hidden"></div>
+                          
+                          {/* زر تعديل غلاف القطاع للمشرف */}
+                          {isAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                triggerImageUpload('subtype-cover', selectedCategoryId, subtype.id);
+                              }}
+                              className="absolute top-3 right-3 bg-sky-600/90 hover:bg-sky-600 text-white p-2 rounded-lg shadow-md hover:scale-105 transition-all cursor-pointer z-20"
+                              title="تعديل غلاف هذا القطاع"
+                            >
+                              <Upload className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* معلومات ملخصة سريعة للقطاع */}
+                        <div className="p-5 sm:col-span-3 flex flex-col justify-between">
+                          <div>
+                            <span className="text-[10px] font-extrabold text-sky-600 tracking-wide uppercase font-mono">UPVC SECTOR PROFILE</span>
+                            <h5 className="text-base sm:text-lg font-bold text-slate-900 group-hover:text-sky-600 transition-colors mt-0.5">
+                              {subtype.name}
+                            </h5>
+                            <p className="text-slate-500 text-xs mt-2 line-clamp-3 leading-relaxed">
+                              {subtype.description}
+                            </p>
+                          </div>
+
+                          <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-slate-700">
+                            <span className="text-slate-500">المنشأ: <span className="text-slate-900">{subtype.specs.origin}</span></span>
+                            <span className="text-sky-600 flex items-center gap-1 group-hover:translate-x-[-4px] transition-transform">
+                              تفاصيل وصور المعرض
+                              <ArrowLeft className="w-3.5 h-3.5" />
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ---- تفاصيل القطاع المفتوح ومعرض الصور الخاص به (Detailed Sector View & Photos Upload) ---- */}
+        <AnimatePresence>
+          {selectedCategoryId && selectedSubtype && (
+            <motion.div
+              id="subtype-details-container"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              transition={{ duration: 0.5 }}
+              className="mt-12 bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-lg"
+            >
+              {/* ترويسة تفاصيل القطاع */}
+              <div className="bg-slate-900 text-white p-6 sm:p-8 relative">
+                <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-sky-400 via-sky-500 to-sky-600"></div>
+                
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-2">
+                  <div>
+                    <span className="text-xs font-bold text-sky-400 tracking-wider uppercase font-mono">Profile Specifications & Completed Projects</span>
+                    <h4 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1">{selectedSubtype.name}</h4>
+                    <p className="text-slate-300 text-xs sm:text-sm mt-2 max-w-3xl leading-relaxed">
+                      {selectedSubtype.description}
+                    </p>
+                  </div>
+
+                  {/* المنشأ */}
+                  <div className="bg-slate-800 border border-slate-700/60 rounded-2xl p-3 px-5 self-start md:self-auto flex items-center gap-3">
+                    <span className="text-xs text-slate-400 font-bold block">منشأ القطاع المعتمد</span>
+                    <span className="text-base font-extrabold text-sky-400">{selectedSubtype.specs.origin}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* جسم التفاصيل (مقسم لعمودين: المواصفات والميزات / معرض صور الأعمال المنفذة) */}
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 p-6 sm:p-8">
+                
+                {/* العمود الأيمن: الخصائص والمواصفات الفنية */}
+                <div className="lg:col-span-5 space-y-6">
+                  
+                  {/* الميزات الرئيسية كقائمة تشيك */}
+                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                    <h5 className="font-bold text-slate-900 text-sm sm:text-base border-b border-slate-200 pb-2 mb-4 flex items-center gap-2">
+                      <span className="text-sky-600">✔</span> ميزات القطاع الفنية والجمالية:
+                    </h5>
+                    <ul className="space-y-3">
+                      {selectedSubtype.features.map((feature, i) => (
+                        <li key={i} className="flex items-start gap-2.5 text-xs sm:text-sm text-slate-700 leading-relaxed">
+                          <CheckCircle2 className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+                          <span>{feature}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* جدول المواصفات الهندسية الفاخر */}
+                  <div className="bg-slate-50 rounded-2xl p-5 border border-slate-200">
+                    <h5 className="font-bold text-slate-900 text-sm sm:text-base border-b border-slate-200 pb-2 mb-4 flex items-center gap-2">
+                      <span className="text-sky-600">⚙</span> المواصفات الفنية والهندسية:
+                    </h5>
+                    <div className="divide-y divide-slate-200/60 text-xs sm:text-sm">
+                      <div className="py-2.5 flex justify-between gap-4">
+                        <span className="text-slate-500 font-medium">عدد غرف العزل (Chambers)</span>
+                        <span className="text-slate-900 font-bold">{selectedSubtype.specs.chambers}</span>
+                      </div>
+                      <div className="py-2.5 flex justify-between gap-4">
+                        <span className="text-slate-500 font-medium">معامل العزل الحراري (U-Value)</span>
+                        <span className="text-slate-900 font-bold font-mono text-left">{selectedSubtype.specs.insulation}</span>
+                      </div>
+                      <div className="py-2.5 flex justify-between gap-4">
+                        <span className="text-slate-500 font-medium">توافق سماكات الزجاج العازل</span>
+                        <span className="text-slate-900 font-bold">{selectedSubtype.specs.glassCompatibility}</span>
+                      </div>
+                      <div className="py-2.5 flex justify-between gap-4">
+                        <span className="text-slate-500 font-medium">العمر الافتراضي والضمان</span>
+                        <span className="text-slate-900 font-bold">{selectedSubtype.specs.durability}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* العمود الأيسر: معرض الصور المرفوعة للأعمال والمشاريع (The core supervisor uploaded photo gallery) */}
+                <div className="lg:col-span-7 space-y-6">
+                  
+                  <div className="flex items-center justify-between gap-4 border-b border-slate-200 pb-3 flex-wrap">
+                    <div>
+                      <h5 className="font-bold text-slate-900 text-sm sm:text-base flex items-center gap-2">
+                        <span className="text-sky-600">🖼</span> معرض صور أعمالنا المنفذة بهذا القطاع:
+                      </h5>
+                      <p className="text-[11px] text-slate-500 mt-1">
+                        صور واقعية حقيقية لفلل وشقق تم تركيب {selectedSubtype.name} بها
+                      </p>
+                    </div>
+
+                    {/* زر رفع وإضافة صورة للمعرض - خاص بالمشرف */}
+                    <button
+                      onClick={() => triggerImageUpload('gallery-add', selectedCategoryId, selectedSubtype.id)}
+                      className={`flex items-center gap-1.5 text-xs font-bold py-2 px-4 rounded-xl transition-all hover:scale-103 cursor-pointer shadow-xs ${
+                        isAdmin 
+                          ? 'bg-sky-600 hover:bg-sky-700 text-white' 
+                          : 'bg-slate-100 hover:bg-sky-50 text-slate-700 hover:text-sky-600 border border-slate-200'
+                      }`}
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>إضافة صور للقطاع {isAdmin ? '(رفع للمشرف)' : ''}</span>
+                    </button>
+                  </div>
+
+                  {/* شبكة الصور التفاعلية للمعرض */}
+                  {selectedSubtype.gallery && selectedSubtype.gallery.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {selectedSubtype.gallery.map((img, index) => (
+                        <div 
+                          key={index}
+                          className="group/item relative aspect-square rounded-xl overflow-hidden bg-slate-900 border border-slate-100 shadow-xs cursor-zoom-in"
+                          onClick={() => openLightbox(selectedSubtype.gallery, index, { type: 'catalog', categoryId: selectedCategoryId || undefined, subtypeId: selectedSubtype.id })}
+                        >
+                          <img 
+                            src={img} 
+                            alt={`Project ${index + 1}`} 
+                            referrerPolicy="no-referrer"
+                            className="w-full h-full object-cover group-hover/item:scale-108 transition-all duration-500"
+                          />
+                          <div className="absolute inset-0 bg-slate-950/60 opacity-0 group-hover/item:opacity-100 transition-opacity flex flex-col items-center justify-between p-3" id={`catalog-item-overlay-${index}`}>
+                            <div className="w-full"></div>
+                            <div className="bg-white/10 backdrop-blur-md p-2.5 rounded-full text-white hover:scale-110 transition-transform duration-200">
+                              <Maximize2 className="text-white w-4 h-4 drop-shadow-md" />
+                            </div>
+                            
+                            {/* أزرار المشاركة السريعة */}
+                            <div 
+                              className="flex items-center gap-1.5 bg-slate-900/95 border border-slate-700/50 px-2 py-1 rounded-xl shadow-md" 
+                              onClick={(e) => e.stopPropagation()}
+                              id={`catalog-item-share-${index}`}
+                            >
+                              <span className="text-[9px] text-slate-300 font-bold font-sans">مشاركة:</span>
+                              <button 
+                                onClick={(e) => handleShare(img, 'whatsapp', e)}
+                                className="p-0.5 hover:bg-emerald-600/20 text-emerald-400 rounded-full transition-colors cursor-pointer"
+                                title="مشاركة عبر واتساب"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={(e) => handleShare(img, 'facebook', e)}
+                                className="p-0.5 hover:bg-blue-600/20 text-blue-400 rounded-full transition-colors cursor-pointer"
+                                title="مشاركة عبر فيسبوك"
+                              >
+                                <Facebook className="w-3.5 h-3.5" />
+                              </button>
+                              <button 
+                                onClick={(e) => handleShare(img, 'copy', e)}
+                                className="p-0.5 hover:bg-slate-700 text-slate-300 rounded-full transition-colors cursor-pointer"
+                                title="نسخ رابط الصورة"
+                              >
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* خيار الحذف السريع من المعرض */}
+                          {isAdmin && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteGalleryImage(index, selectedCategoryId, selectedSubtype.id);
+                              }}
+                              className="absolute bottom-2 left-2 bg-red-600/95 hover:bg-red-700 text-white p-2 rounded-lg shadow-md hover:scale-110 transition-all duration-200 cursor-pointer z-10"
+                              title="حذف هذه الصورة نهائياً"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-slate-50 rounded-2xl p-8 text-center border-2 border-dashed border-slate-200">
+                      <ImageIcon className="w-10 h-10 text-slate-400 mx-auto mb-3" />
+                      <p className="text-sm font-bold text-slate-600 mb-1">لا توجد صور مخصصة بعد في المعرض لهذا القطاع</p>
+                      <p className="text-xs text-slate-400 mb-4">أنت تشاهد حالياً المواصفات القياسية. يرجى من المشرف رفع صور أعمال من لوحة التحكم.</p>
+                      <button
+                        onClick={() => triggerImageUpload('gallery-add', selectedCategoryId, selectedSubtype.id)}
+                        className="bg-white hover:bg-slate-50 text-sky-600 border border-slate-200 text-xs font-bold py-2 px-4 rounded-xl shadow-xs cursor-pointer inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>ارفع أول صورة للمشروع الآن</span>
+                      </button>
+                    </div>
+                  )}
+
+                  {/* نصيحة للمشرف */}
+                  {isAdmin && (
+                    <div className="bg-sky-50 text-sky-700 p-3.5 rounded-xl border border-sky-100 text-xs leading-relaxed">
+                      💡 <strong>نصيحة للمشرف:</strong> يمكنك النقر فوق أي صورة في المعرض لعرضها بحجم كامل، وتستطيع رفع صور المشاريع مباشرة من جوالك بلقطات واضحة ليراها الزوار فوراً.
+                    </div>
+                  )}
+
+                </div>
+
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+      </main>
+      )}
+
+      {selectedSectionView === null && (
+        /* ---- ميزات ومزايا شركة المكاوي الفنية الكلية (Company Advantages Overview) ---- */
+        <section className="bg-white border-t border-b border-slate-200/60 py-16">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-3xl mx-auto mb-12">
+              <span className="text-sky-600 font-bold text-xs sm:text-sm tracking-wider uppercase font-mono">WHY CHOOSE AL-MEKAWY PVC</span>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-slate-900 mt-1">لماذا تختار أبواب وشبابيك المكاوي UPVC؟</h3>
+              <p className="text-slate-600 text-xs sm:text-sm mt-3 max-w-xl mx-auto leading-relaxed">
+                نوظف أعلى جودة في تجميع قطاعات الـ PVC واللحامات حرارية المزدوجة لنضمن لبيتك أقصى درجات الراحة والعزل والاستقرار اللوني.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {advantages.map((adv, index) => {
+                // أيقونة مخصصة لكل ميزة
+                let IconComponent = Shield;
+                if (adv.icon === 'Flame') IconComponent = Flame;
+                if (adv.icon === 'Wind') IconComponent = Wind;
+                if (adv.icon === 'Lock') IconComponent = Lock;
+
+                return (
+                  <div key={index} className="bg-slate-50/50 p-6 rounded-2xl border border-slate-150 hover:border-sky-200 hover:bg-white transition-all duration-300">
+                    <div className="bg-sky-50 text-sky-600 p-3 rounded-xl w-fit mb-4">
+                      <IconComponent className="w-5 h-5" />
+                    </div>
+                    <h4 className="font-bold text-slate-900 text-base mb-2">{adv.title}</h4>
+                    <p className="text-slate-600 text-xs sm:text-sm leading-relaxed">{adv.description}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ---- الفوتر الأنيق والراقي لمعلومات الموقع والشركة ---- */}
+      <footer className="bg-slate-950 text-slate-400 py-12 border-t border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+          
+          {/* معلومات الشعار والاسم */}
+          <div>
+            <div className="flex items-center gap-3 mb-4">
+              <AlmekawyLogo size="sm" variant="dark" showText={false} />
+              <h4 className="text-lg font-bold text-white tracking-wide">المكاوي هوم للـ UPVC</h4>
+            </div>
+            <p className="text-xs text-slate-500 leading-relaxed mb-4 max-w-sm">
+              أبواب وشبابيك الـ PVC الفاخرة بقطاعات جرارة ومفصلية تركية وألمانية، جودة تصنيع متطورة وعزل مثالي للمياه والأتربة والضوضاء.
+            </p>
+            
+            {/* أزرار التواصل الاجتماعي الفاخرة */}
+            <div className="flex items-center gap-3 mb-5">
+              <a 
+                href="https://web.facebook.com/almekawy.home?rdid=xIM9V6v8VmepuEBu&share_url=https%3A%2F%2Fweb.facebook.com%2Fshare%2F1Bfwi9XFow%2F%3F_rdc%3D1%26_rdr#" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-slate-900 hover:bg-blue-600 text-slate-300 hover:text-white p-2.5 rounded-xl transition-all duration-300 border border-slate-800 flex items-center justify-center shadow-xs cursor-pointer"
+                title="صفحة الفيسبوك"
+              >
+                <Facebook className="w-4 h-4" />
+              </a>
+              <a 
+                href="https://www.instagram.com/almekawy.home?igsh=bXBqZmw3NGt4bzVs" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-slate-900 hover:bg-gradient-to-tr hover:from-yellow-500 hover:via-pink-500 hover:to-purple-600 text-slate-300 hover:text-white p-2.5 rounded-xl transition-all duration-300 border border-slate-800 flex items-center justify-center shadow-xs cursor-pointer"
+                title="حساب الإنستغرام"
+              >
+                <Instagram className="w-4 h-4" />
+              </a>
+              <a 
+                href="https://www.tiktok.com/@almekawy.home?_r=1&_t=ZS-971BmNPuWbk" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="bg-slate-900 hover:bg-black text-slate-300 hover:text-white px-3 py-2 rounded-xl transition-all duration-300 border border-slate-800 flex items-center gap-1.5 shadow-xs cursor-pointer text-xs font-semibold"
+                title="صفحة التيكتوك"
+              >
+                <Video className="w-3.5 h-3.5 text-rose-500" />
+                <span>TikTok</span>
+              </a>
+            </div>
+
+            <div className="text-xs font-mono tracking-wider text-slate-600">
+              AL-MEKAWY HOME UPVC PHOTO © 2026
+            </div>
+          </div>
+
+          {/* عناوين وتواصل تفاعلي */}
+          <div className="space-y-3.5">
+            <h5 className="text-white font-bold text-sm mb-2">تواصل معنا المباشر</h5>
+            
+            {/* أرقام الاتصال */}
+            <div className="flex items-start gap-2.5 text-xs">
+              <Phone className="w-4 h-4 text-sky-500 shrink-0 mt-0.5" />
+              <div className="flex flex-col gap-1.5">
+                <a href="tel:+201060524985" className="hover:text-sky-400 transition-colors font-medium">
+                  مبيعات 1: <span className="font-mono">01060524985</span>
+                </a>
+                <a href="tel:+201141761261" className="hover:text-sky-400 transition-colors font-medium">
+                  مبيعات 2: <span className="font-mono">01141761261</span>
+                </a>
+              </div>
+            </div>
+
+            {/* واتساب */}
+            <div className="flex items-center gap-2.5 text-xs pt-1">
+              <MessageCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+              <a 
+                href="https://wa.me/201141761261" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="text-emerald-400 hover:text-emerald-300 hover:underline transition-colors font-bold"
+              >
+                راسلنا على واتساب: <span className="font-mono">01141761261</span>
+              </a>
+            </div>
+          </div>
+
+          {/* تذييل المشرف السريع والدخول الآمن */}
+          <div className="bg-slate-900/60 p-5 rounded-2xl border border-slate-800/80">
+            <h5 className="text-white font-bold text-sm mb-2">إدارة صور الكتالوج والمحتوى</h5>
+            <p className="text-xs text-slate-500 mb-4 leading-relaxed">
+              هذه البوابة مخصصة للمشرف المعتمد لإضافة الصور والأعمال وتحديث القطاعات الفنية بشكل دوري.
+            </p>
+            {!isAdmin ? (
+              <button
+                onClick={() => setShowLoginModal(true)}
+                className="w-full bg-slate-800 hover:bg-sky-600 text-white text-xs font-bold py-2 px-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Lock className="w-3.5 h-3.5" />
+                <span>تسجيل دخول المشرف</span>
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-xs text-green-400 font-bold flex items-center gap-1">
+                  <Check className="w-4 h-4" /> وضع التعديل نشط حالياً
+                </div>
+                <button
+                  onClick={handleLogout}
+                  className="w-full bg-red-950/40 hover:bg-red-900/40 text-red-400 border border-red-900/60 text-xs font-bold py-2 px-3 rounded-lg transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>خروج المشرف والتمكين العادي</span>
+                </button>
+              </div>
+            )}
+          </div>
+
+        </div>
+      </footer>
+
+      {/* ---- مدخلات رفع الصور والملفات المخفية (Hidden File Inputs) ---- */}
+      <input 
+        type="file" 
+        ref={categoryFileInputRef} 
+        onChange={handleFileChange} 
+        accept="image/*" 
+        className="hidden" 
+      />
+      <input 
+        type="file" 
+        ref={subtypeCoverFileInputRef} 
+        onChange={handleFileChange} 
+        accept="image/*" 
+        className="hidden" 
+      />
+      <input 
+        type="file" 
+        ref={galleryFileInputRef} 
+        onChange={handleFileChange} 
+        accept="image/*" 
+        className="hidden" 
+      />
+      <input 
+        type="file" 
+        ref={customGalleryInputRef} 
+        onChange={handleCustomGalleryFileChange} 
+        accept="image/*" 
+        className="hidden" 
+      />
+
+      {/* ---- نافذة الدخول للمشرف (Login Dialog / Modal) ---- */}
+      <AnimatePresence>
+        {showLoginModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowLoginModal(false)}
+              className="absolute inset-0 bg-slate-950/60 backdrop-blur-xs"
+            ></motion.div>
+            
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="bg-white rounded-3xl w-full max-w-md overflow-hidden relative z-10 shadow-2xl border border-slate-100"
+            >
+              {/* شريط علوي ملون */}
+              <div className="h-1.5 bg-sky-600"></div>
+
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                    <Lock className="text-sky-600 w-5 h-5" />
+                    بوابة دخول المشرف للكتالوج
+                  </h4>
+                  <button 
+                    onClick={() => setShowLoginModal(false)}
+                    className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 cursor-pointer transition-colors"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+                <p className="text-xs text-slate-500 mb-5 leading-relaxed">
+                  الرجاء إدخال كلمة مرور المشرف للبدء في إدارة الصور ورفع أعمال شركة المكاوي في المعرض. <br />
+                  <strong className="text-sky-600">كلمة المرور للتجربة: 662006</strong>
+                </p>
+
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1.5">كلمة مرور المشرف (Password):</label>
+                    <input 
+                      type="password" 
+                      value={passwordInput}
+                      onChange={(e) => setPasswordInput(e.target.value)}
+                      placeholder="••••••"
+                      autoFocus
+                      className="w-full px-4 py-2.5 rounded-xl border border-slate-200 text-slate-900 placeholder:text-slate-300 focus:outline-hidden focus:ring-2 focus:ring-sky-500/25 focus:border-sky-500 font-mono tracking-widest text-center"
+                    />
+                  </div>
+
+                  {loginError && (
+                    <div className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100 text-center font-semibold">
+                      {loginError}
+                    </div>
+                  )}
+
+                  <div className="flex gap-3 pt-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLoginModal(false)}
+                      className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold py-3 px-4 rounded-xl cursor-pointer transition-colors"
+                    >
+                      إلغاء
+                    </button>
+                    <button
+                      type="submit"
+                      className="flex-1 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold py-3 px-4 rounded-xl cursor-pointer transition-colors"
+                    >
+                      تأكيد الدخول
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ---- نافذة عرض الصور بكامل حجم الشاشة (Lightbox Slider) ---- */}
+      <AnimatePresence>
+        {lightboxIndex !== null && lightboxImages.length > 0 && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeLightbox}
+              className="absolute inset-0 bg-black/95 backdrop-blur-xs"
+            ></motion.div>
+
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="relative max-w-4xl max-h-[85vh] w-full h-full flex items-center justify-center z-10"
+            >
+              <img 
+                src={lightboxImages[lightboxIndex]} 
+                alt="Full project layout" 
+                referrerPolicy="no-referrer"
+                className="max-w-full max-h-full object-contain rounded-lg select-none"
+              />
+
+              {/* أزرار التنقل يمين ويسار إن كان هناك أكثر من صورة */}
+              {lightboxImages.length > 1 && (
+                <>
+                  <button 
+                    onClick={() => navigateLightbox('next')}
+                    className="absolute right-2 sm:right-[-50px] bg-white/10 hover:bg-white/20 text-white p-3 rounded-full cursor-pointer transition-colors"
+                  >
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
+                  <button 
+                    onClick={() => navigateLightbox('prev')}
+                    className="absolute left-2 sm:left-[-50px] bg-white/10 hover:bg-white/20 text-white p-3 rounded-full cursor-pointer transition-colors"
+                  >
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                </>
+              )}
+
+              {/* شريط المشاركة في المعاينة التكبيرية */}
+              <div className="absolute top-[-44px] left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-slate-700/50 flex items-center gap-3 shadow-lg z-20">
+                <span className="text-slate-300 text-xs font-bold font-sans flex items-center gap-1.5 shrink-0">
+                  <Share2 className="w-3.5 h-3.5 text-sky-400" />
+                  <span className="hidden xs:inline">مشاركة الصورة:</span>
+                </span>
+                <button 
+                  onClick={() => handleShare(lightboxImages[lightboxIndex], 'whatsapp')}
+                  className="flex items-center gap-1 text-xs text-emerald-400 hover:text-white bg-emerald-500/10 hover:bg-emerald-600 px-2.5 py-1 rounded-full transition-all duration-200 cursor-pointer font-bold shrink-0"
+                  title="مشاركة عبر واتساب"
+                >
+                  <MessageCircle className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">واتساب</span>
+                </button>
+                <button 
+                  onClick={() => handleShare(lightboxImages[lightboxIndex], 'facebook')}
+                  className="flex items-center gap-1 text-xs text-blue-400 hover:text-white bg-blue-500/10 hover:bg-blue-600 px-2.5 py-1 rounded-full transition-all duration-200 cursor-pointer font-bold shrink-0"
+                  title="مشاركة عبر فيسبوك"
+                >
+                  <Facebook className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">فيسبوك</span>
+                </button>
+                <button 
+                  onClick={() => handleShare(lightboxImages[lightboxIndex], 'copy')}
+                  className="flex items-center gap-1 text-xs text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-600 px-2.5 py-1 rounded-full transition-all duration-200 cursor-pointer font-bold shrink-0"
+                  title="نسخ الرابط"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">نسخ الرابط</span>
+                </button>
+              </div>
+
+              {/* زر الإغلاق العلوي */}
+              <button 
+                onClick={closeLightbox}
+                className="absolute top-[-40px] right-2 bg-white/15 hover:bg-white/30 text-white p-2 rounded-lg cursor-pointer transition-colors"
+              >
+                ✕ إغلاق المعاينة
+              </button>
+
+              {/* زر الحذف للمشرف */}
+              {isAdmin && lightboxSource && (
+                <button 
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteFromLightbox();
+                  }}
+                  className="absolute top-[-40px] left-2 bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg cursor-pointer transition-colors flex items-center gap-1.5 text-xs font-bold shadow-md hover:scale-102 active:scale-98"
+                  title="حذف هذه الصورة نهائياً من المعرض"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>حذف الصورة 🗑️</span>
+                </button>
+              )}
+
+              {/* مؤشر ترقيم الصور */}
+              <div className="absolute bottom-[-35px] left-0 right-0 text-center text-slate-400 text-xs font-bold">
+                صورة {lightboxIndex + 1} من أصل {lightboxImages.length}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ---- إشعارات التنبيه المخصصة (Toast Message) ---- */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div 
+            initial={{ opacity: 0, y: 50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className={`fixed bottom-6 left-6 right-6 sm:left-auto sm:max-w-md z-50 p-4 rounded-2xl shadow-xl border flex items-start gap-3 ${
+              toast.type === 'success' 
+                ? 'bg-green-50 text-green-800 border-green-200' 
+                : toast.type === 'error' 
+                  ? 'bg-red-50 text-red-800 border-red-200' 
+                  : 'bg-sky-50 text-sky-800 border-sky-200'
+            }`}
+          >
+            <div className="flex-1 text-xs sm:text-sm font-semibold leading-relaxed">
+              {toast.message}
+            </div>
+            <button 
+              onClick={() => setToast(null)}
+              className="text-slate-400 hover:text-slate-600 text-xs cursor-pointer font-bold shrink-0"
+            >
+              ✕
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    </div>
+  );
+}

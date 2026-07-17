@@ -195,11 +195,20 @@ export default function App() {
     }
 
     try {
-      await fetch('/api/catalog', {
+      const res = await fetch('/api/catalog', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ catalog: newCatalog })
       });
+      const json = await res.json();
+      if (json.success && json.data) {
+        setCatalog(json.data);
+        try {
+          localStorage.setItem('al_mekawy_catalog_v1', JSON.stringify(json.data));
+        } catch (e) {
+          console.error("Error saving to localStorage:", e);
+        }
+      }
     } catch (e) {
       console.error("Error saving catalog to server:", e);
       showToast('⚠️ تعذر حفظ التعديلات على الخادم الرئيسي، تم الحفظ محلياً فقط.', 'error');
@@ -223,6 +232,14 @@ export default function App() {
       });
       const json = await res.json();
       if (json.success) {
+        if (json.data) {
+          setGalleryPhotos(json.data);
+          try {
+            localStorage.setItem('al_mekawy_three_tab_gallery_v1', JSON.stringify(json.data));
+          } catch (e) {
+            console.error("Error saving gallery photos to localStorage:", e);
+          }
+        }
         showToast('✅ تم حفظ الصور ونشرها بنجاح للجميع على الخادم!', 'success');
       } else {
         showToast('⚠️ تم الحفظ محلياً وتعذر النشر على الخادم.', 'info');

@@ -110,6 +110,60 @@ function writeJsonFile(filePath: string, data: any) {
   }
 }
 
+// ---- KVDB.IO Cloud Sync Helper ----
+const BUCKET = "mekawypvcef68fb64";
+
+async function syncFromCloud() {
+  console.log("🔄 Syncing data from Cloud Backup (kvdb.io)...");
+  try {
+    // Sync gallery photos
+    const galleryRes = await fetch(`https://kvdb.io/${BUCKET}/gallery`);
+    if (galleryRes.ok) {
+      const text = await galleryRes.text();
+      if (text && text.trim().startsWith('{')) {
+        const galleryData = JSON.parse(text);
+        fs.writeFileSync(GALLERY_FILE, JSON.stringify(galleryData), 'utf-8');
+        console.log("✅ Synced gallery from cloud backup successfully.");
+      }
+    } else {
+      console.log("ℹ️ No gallery backup found in cloud, using local or default.");
+    }
+
+    // Sync catalog
+    const catalogRes = await fetch(`https://kvdb.io/${BUCKET}/catalog`);
+    if (catalogRes.ok) {
+      const text = await catalogRes.text();
+      if (text && text.trim().startsWith('[')) {
+        const catalogData = JSON.parse(text);
+        fs.writeFileSync(CATALOG_FILE, JSON.stringify(catalogData), 'utf-8');
+        console.log("✅ Synced catalog from cloud backup successfully.");
+      }
+    } else {
+      console.log("ℹ️ No catalog backup found in cloud, using local or default.");
+    }
+  } catch (err) {
+    console.error("❌ Failed to sync from cloud backup on startup:", err);
+  }
+}
+
+async function syncToCloud(key: 'gallery' | 'catalog', data: any) {
+  try {
+    console.log(`📤 Backing up ${key} to cloud (kvdb.io)...`);
+    const res = await fetch(`https://kvdb.io/${BUCKET}/${key}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+      headers: { 'Content-Type': 'application/json' }
+    });
+    if (res.ok) {
+      console.log(`✅ Successfully backed up ${key} to cloud (kvdb.io).`);
+    } else {
+      console.error(`❌ Failed to backup ${key} to cloud: Status ${res.status}`);
+    }
+  } catch (err) {
+    console.error(`❌ Error backup of ${key} to cloud:`, err);
+  }
+}
+
 // API Routes
 app.get("/api/gallery", (req, res) => {
   const data = readJsonFile(GALLERY_FILE, null);
@@ -139,6 +193,10 @@ app.post("/api/gallery", async (req, res) => {
       }
     }
     const success = writeJsonFile(GALLERY_FILE, updatedPhotos);
+    if (success) {
+      // Back up to cloud asynchronously so it doesn't block the API response
+      syncToCloud('gallery', updatedPhotos).catch(err => console.error("Async gallery sync failed:", err));
+    }
     res.json({ success, data: updatedPhotos });
   } catch (error) {
     console.error("Error processing gallery photos upload:", error);
@@ -160,6 +218,10 @@ app.post("/api/catalog", async (req, res) => {
   try {
     const processedCatalog = await processCatalogImages(catalog);
     const success = writeJsonFile(CATALOG_FILE, processedCatalog);
+    if (success) {
+      // Back up to cloud asynchronously so it doesn't block the API response
+      syncToCloud('catalog', processedCatalog).catch(err => console.error("Async catalog sync failed:", err));
+    }
     res.json({ success, data: processedCatalog });
   } catch (error) {
     console.error("Error processing catalog:", error);
@@ -169,6 +231,9 @@ app.post("/api/catalog", async (req, res) => {
 
 
 async function start() {
+  // Sync the latest state from cloud backup before server handles any requests
+  await syncFromCloud();
+
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },

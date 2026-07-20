@@ -73,6 +73,98 @@ export default function App() {
   // إشعارات التنبيه (Toast Notifications)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
+  // ---- سلايدر الصور التلقائي الرئيسي (Auto-playing Carousel Slider States & Logic) ----
+  const [currentCarouselIndex, setCurrentCarouselIndex] = useState<number>(0);
+  const [isCarouselAutoplayPaused, setIsCarouselAutoplayPaused] = useState<boolean>(false);
+
+  // تجميع صور السلايدر التفاعلي من المعرض المرفوع والافتراضي
+  const carouselItems = React.useMemo(() => {
+    const items: Array<{
+      img: string;
+      title: string;
+      category: 'doors' | 'windows' | 'balconies';
+      categoryLabel: string;
+      description: string;
+    }> = [];
+
+    // إضافة الصور بالتناوب لمنح مظهر متكامل ومتنوع
+    const maxLen = Math.max(
+      galleryPhotos?.doors?.length || 0,
+      galleryPhotos?.windows?.length || 0,
+      galleryPhotos?.balconies?.length || 0
+    );
+
+    for (let i = 0; i < maxLen; i++) {
+      if (galleryPhotos?.doors?.[i]) {
+        items.push({
+          img: galleryPhotos.doors[i],
+          title: i === 0 ? "أبواب الـ PVC المفصلية والجرارة الفاخرة" : `مشروع أبواب بي في سي متميز - رقم ${i + 1}`,
+          category: 'doors',
+          categoryLabel: "أبواب الـ PVC",
+          description: "قطاعات معززة وتصاميم فخمة مقاومة للرطوبة والمياه وعازلة للضوضاء"
+        });
+      }
+      if (galleryPhotos?.windows?.[i]) {
+        items.push({
+          img: galleryPhotos.windows[i],
+          title: i === 0 ? "شبابيك الـ PVC الألمانية والتركية دبل جلاس" : `مشروع شبابيك بي في سي عازلة - رقم ${i + 1}`,
+          category: 'windows',
+          categoryLabel: "شبابيك الـ PVC",
+          description: "عزل صوتي وحراري كامل مع سدادات مزدوجة لمنع دخول الغبار بالكامل"
+        });
+      }
+      if (galleryPhotos?.balconies?.[i]) {
+        items.push({
+          img: galleryPhotos.balconies[i],
+          title: i === 0 ? "تقفيل بلكونات وشرفات الـ PVC بأعلى دقة" : `مشروع تقفيل شرفة بي في سي - رقم ${i + 1}`,
+          category: 'balconies',
+          categoryLabel: "تقفيل البلكونات",
+          description: "مساحات معيشة هادئة وعصرية محمية تماماً من الرياح والأمطار والأتربة"
+        });
+      }
+    }
+
+    // إذا لم يكن هناك صور، نضع صورًا افتراضية
+    if (items.length === 0) {
+      items.push(
+        {
+          img: DEFAULT_IMAGES.doorSliding,
+          title: "أبواب الـ PVC المفصلية والجرارة الفاخرة",
+          category: 'doors',
+          categoryLabel: "أبواب الـ PVC",
+          description: "قطاعات معززة وتصاميم فخمة مقاومة للرطوبة والمياه وعازلة للضوضاء"
+        },
+        {
+          img: DEFAULT_IMAGES.windowGerman,
+          title: "شبابيك الـ PVC الألمانية والتركية دبل جلاس",
+          category: 'windows',
+          categoryLabel: "شبابيك الـ PVC",
+          description: "عزل صوتي وحراري كامل مع سدادات مزدوجة لمنع دخول الغبار بالكامل"
+        },
+        {
+          img: INITIAL_THREE_TAB_PHOTOS.balconies[0],
+          title: "تقفيل بلكونات وشرفات الـ PVC بأعلى دقة",
+          category: 'balconies',
+          categoryLabel: "تقفيل البلكونات",
+          description: "مساحات معيشة هادئة وعصرية محمية تماماً من الرياح والأمطار والأتربة"
+        }
+      );
+    }
+
+    return items;
+  }, [galleryPhotos]);
+
+  // تأثير التدوير التلقائي للسلايدر
+  useEffect(() => {
+    if (isCarouselAutoplayPaused || carouselItems.length <= 1) return;
+    
+    const interval = setInterval(() => {
+      setCurrentCarouselIndex((prev) => (prev + 1) % carouselItems.length);
+    }, 4500); // كل 4.5 ثانية
+
+    return () => clearInterval(interval);
+  }, [isCarouselAutoplayPaused, carouselItems.length]);
+
   // ملفات الرفع المخفية (Refs for hidden file inputs)
   const categoryFileInputRef = useRef<HTMLInputElement>(null);
   const subtypeCoverFileInputRef = useRef<HTMLInputElement>(null);
@@ -282,28 +374,105 @@ export default function App() {
   };
 
   // ---- مشاركة الصور عبر الشبكات الاجتماعية ونظام نسخ الروابط ----
-  const handleShare = (imgUrl: string, platform: 'whatsapp' | 'facebook' | 'copy', e?: React.MouseEvent) => {
+  const handleShare = async (imgUrl: string, platform: 'whatsapp' | 'facebook' | 'copy' | 'download_share', e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     
-    // في حال كانت الصورة عبارة عن Data URL (ترميز base64) نقوم بمشاركة رابط الموقع نفسه
     const isDataUrl = imgUrl.startsWith('data:');
     const shareUrl = isDataUrl ? window.location.href : (imgUrl.startsWith('http') ? imgUrl : window.location.origin + imgUrl);
     const shareText = `شاهد هذا العمل المميز من شركة المكاوي هوم لأعمال الـ UPVC والشبابيك والأبواب:\n${shareUrl}`;
 
-    if (platform === 'whatsapp') {
-      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
-      window.open(waUrl, '_blank');
-      showToast('📲 جاري فتح واتساب للمشاركة...', 'success');
-    } else if (platform === 'facebook') {
-      const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
-      window.open(fbUrl, '_blank');
-      showToast('🌐 جاري فتح فيسبوك للمشاركة...', 'success');
-    } else if (platform === 'copy') {
+    if (platform === 'copy') {
       navigator.clipboard.writeText(shareUrl).then(() => {
         showToast('📋 تم نسخ رابط الصورة بنجاح إلى الحافظة!', 'success');
       }).catch(() => {
         showToast('❌ عذراً، لم نتمكن من نسخ الرابط.', 'error');
       });
+      return;
+    }
+
+    if (platform === 'whatsapp') {
+      const waUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(shareText)}`;
+      window.open(waUrl, '_blank');
+      showToast('📲 جاري فتح واتساب للمشاركة المباشرة...', 'success');
+      return;
+    }
+
+    if (platform === 'facebook') {
+      const fbUrl = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+      window.open(fbUrl, '_blank');
+      showToast('🌐 جاري فتح فيسبوك للمشاركة المباشرة...', 'success');
+      return;
+    }
+
+    // للمشاركة عبر تنزيل الملف (download_share)
+    showToast('⏳ جاري إعداد الصورة للتحميل والمشاركة المباشرة...', 'info');
+
+    try {
+      let blob: Blob;
+      if (isDataUrl) {
+        // إذا كانت الصورة base64 نقوم بتحويلها إلى Blob
+        const parts = imgUrl.split(';base64,');
+        const contentType = parts[0].split(':')[1];
+        const raw = window.atob(parts[1]);
+        const rawLength = raw.length;
+        const uInt8Array = new Uint8Array(rawLength);
+        for (let i = 0; i < rawLength; ++i) {
+          uInt8Array[i] = raw.charCodeAt(i);
+        }
+        blob = new Blob([uInt8Array], { type: contentType });
+      } else {
+        // جلب ملف الصورة من الرابط (روابط Cloudinary أو الروابط المحلية)
+        const response = await fetch(imgUrl);
+        blob = await response.blob();
+      }
+
+      const mimeType = blob.type || 'image/jpeg';
+      const extension = mimeType.split('/')[1] || 'jpg';
+      const fileName = `al_mekawy_upvc_${Date.now()}.${extension}`;
+      const file = new File([blob], fileName, { type: mimeType });
+      const objectUrl = window.URL.createObjectURL(blob);
+
+      // تحميل الصورة فورياً على جهاز المستخدم
+      const downloadAnchor = document.createElement('a');
+      downloadAnchor.href = objectUrl;
+      downloadAnchor.download = fileName;
+      document.body.appendChild(downloadAnchor);
+      downloadAnchor.click();
+      document.body.removeChild(downloadAnchor);
+      window.URL.revokeObjectURL(objectUrl);
+
+      // محاولة مشاركة الصورة الفعلية كملف باستخدام Web Share API في الهواتف الذكية والأجهزة المتوافقة
+      if (platform === 'download_share') {
+        if (navigator.share && navigator.canShare) {
+          if (navigator.canShare({ files: [file] })) {
+            await navigator.share({
+              files: [file],
+              title: 'شركة المكاوي UPVC',
+              text: 'شاهد هذا العمل المميز من شركة المكاوي هوم لأعمال الـ UPVC والشبابيك والأبواب'
+            });
+            showToast('✅ تم تحميل الصورة وفتح خيارات المشاركة بنجاح!', 'success');
+            return;
+          }
+        }
+        showToast('📥 تم تحميل وحفظ الصورة على جهازك بنجاح!', 'success');
+        return;
+      }
+
+    } catch (error) {
+      console.error("Error fetching or sharing image file:", error);
+      // طريقة احتياطية بسيطة في حال فشل fetch أو التحويل
+      try {
+        const downloadAnchor = document.createElement('a');
+        downloadAnchor.href = imgUrl;
+        downloadAnchor.target = '_blank';
+        downloadAnchor.download = `al_mekawy_upvc_${Date.now()}.jpg`;
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        document.body.removeChild(downloadAnchor);
+        showToast('📥 تم فتح وتحميل الصورة بنجاح.', 'success');
+      } catch (innerError) {
+        showToast('❌ عذراً، تعذر تنزيل الصورة.', 'error');
+      }
     }
   };
 
@@ -1089,6 +1258,128 @@ export default function App() {
             </div>
           </section>
 
+          {/* ---- سلايدر المشاريع التفاعلي التلقائي الجديد (Auto-Playing Carousel Slider) ---- */}
+          <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-4">
+            <div className="text-center mb-6">
+              <span className="text-xs font-bold text-sky-600 tracking-wider uppercase font-mono px-3 py-1 bg-sky-50 rounded-full">🔄 معرض المشاريع الحي التفاعلي</span>
+              <h3 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight mt-2.5">
+                مشاريعنا المنفذة تتحرك أمام عينيك
+              </h3>
+              <p className="text-slate-500 text-xs sm:text-sm mt-1">
+                تصفح لقطات حية حقيقية وتصميمات فريدة من أعمال شركة المكاوي، انقر للتكبير أو استكشاف القسم
+              </p>
+            </div>
+
+            <div 
+              id="home-carousel-container"
+              className="relative w-full aspect-[16/10] sm:aspect-[21/9] max-h-[480px] bg-slate-900 rounded-3xl overflow-hidden border border-slate-200/80 shadow-md group/carousel"
+              onMouseEnter={() => setIsCarouselAutoplayPaused(true)}
+              onMouseLeave={() => setIsCarouselAutoplayPaused(false)}
+            >
+              {/* Slideshow Content */}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentCarouselIndex}
+                  initial={{ opacity: 0, scale: 1.02 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.98 }}
+                  transition={{ duration: 0.6, ease: "easeInOut" }}
+                  className="absolute inset-0 w-full h-full"
+                >
+                  <img 
+                    src={carouselItems[currentCarouselIndex].img} 
+                    alt={carouselItems[currentCarouselIndex].title} 
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-cover select-none"
+                  />
+                  {/* Subtle Dark Gradient Overlay for text readability */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/30 to-transparent"></div>
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Glassmorphic Slide Information Box */}
+              <div className="absolute bottom-6 right-6 left-6 md:right-10 md:left-auto md:max-w-md p-5 rounded-2xl bg-slate-950/85 border border-slate-800 text-white backdrop-blur-md shadow-xl flex flex-col gap-2 text-right rtl z-10 transition-transform duration-300">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1 bg-sky-500/20 text-sky-400 text-[10px] font-extrabold px-2 py-1 rounded-md border border-sky-500/30">
+                    <ImageIcon className="w-3 h-3" />
+                    {carouselItems[currentCarouselIndex].categoryLabel}
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-bold font-sans">
+                    لقطة {currentCarouselIndex + 1} من {carouselItems.length}
+                  </span>
+                </div>
+                <h4 className="text-sm sm:text-base font-extrabold text-white tracking-tight leading-snug">
+                  {carouselItems[currentCarouselIndex].title}
+                </h4>
+                <p className="text-xs text-slate-300 leading-relaxed font-sans line-clamp-2 md:line-clamp-none">
+                  {carouselItems[currentCarouselIndex].description}
+                </p>
+
+                {/* Interactive Action Buttons */}
+                <div className="flex items-center gap-2 mt-2">
+                  {/* Zoom button */}
+                  <button
+                    onClick={() => openLightbox(
+                      carouselItems.map(item => item.img), 
+                      currentCarouselIndex, 
+                      { type: 'custom', tab: carouselItems[currentCarouselIndex].category }
+                    )}
+                    className="flex items-center justify-center gap-1.5 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 text-white text-[11px] font-bold px-3 py-1.5 rounded-xl transition-all duration-200 cursor-pointer hover:scale-102"
+                  >
+                    <Maximize2 className="w-3.5 h-3.5 text-sky-400" />
+                    <span>تكبير اللقطة</span>
+                  </button>
+
+                  {/* Explore section button */}
+                  <button
+                    onClick={() => {
+                      setActiveGalleryTab(carouselItems[currentCarouselIndex].category);
+                      setSelectedSectionView(carouselItems[currentCarouselIndex].category);
+                      window.scrollTo({ top: 0, behavior: 'smooth' });
+                    }}
+                    className="flex items-center justify-center gap-1.5 bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-xl transition-all duration-200 cursor-pointer hover:scale-102"
+                  >
+                    <span>استكشاف القسم</span>
+                    <ArrowLeft className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Navigation Arrows */}
+              <button 
+                onClick={() => setCurrentCarouselIndex((prev) => (prev - 1 + carouselItems.length) % carouselItems.length)}
+                className="absolute top-1/2 left-4 transform -translate-y-1/2 p-2 rounded-full bg-slate-900/60 hover:bg-sky-600 text-white border border-slate-700/50 backdrop-blur-xs transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer opacity-0 group-hover/carousel:opacity-100 focus:opacity-100 z-10"
+                title="الصورة السابقة"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              
+              <button 
+                onClick={() => setCurrentCarouselIndex((prev) => (prev + 1) % carouselItems.length)}
+                className="absolute top-1/2 right-4 transform -translate-y-1/2 p-2 rounded-full bg-slate-900/60 hover:bg-sky-600 text-white border border-slate-700/50 backdrop-blur-xs transition-all duration-300 hover:scale-110 active:scale-95 cursor-pointer opacity-0 group-hover/carousel:opacity-100 focus:opacity-100 z-10"
+                title="الصورة التالية"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+
+              {/* Dynamic Bottom Dots Indicator */}
+              <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 flex items-center gap-1.5 z-10 bg-slate-950/40 px-3 py-1.5 rounded-full backdrop-blur-xs">
+                {carouselItems.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => setCurrentCarouselIndex(idx)}
+                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                      idx === currentCarouselIndex 
+                        ? 'w-5 bg-sky-500' 
+                        : 'w-2 bg-white/40 hover:bg-white/70'
+                    }`}
+                    title={`الذهاب إلى الصورة ${idx + 1}`}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+
           {/* ---- قسم البنود الثلاثة الرئيسي للمكاوي UPVC ---- */}
           <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div className="text-center mb-10">
@@ -1307,22 +1598,29 @@ export default function App() {
                       
                       {/* أزرار المشاركة السريعة */}
                       <div 
-                        className="flex items-center gap-2 bg-slate-900/95 border border-slate-700/50 px-3 py-1.5 rounded-2xl shadow-lg" 
+                        className="flex items-center gap-1.5 bg-slate-900/95 border border-slate-700/50 px-2.5 py-1.5 rounded-2xl shadow-lg" 
                         onClick={(e) => e.stopPropagation()}
                         id={`gallery-item-share-${index}`}
                       >
-                        <span className="text-[10px] text-slate-300 font-bold font-sans">مشاركة:</span>
+                        <span className="text-[10px] text-slate-300 font-bold font-sans">تحميل ومشاركة:</span>
+                        <button 
+                          onClick={(e) => handleShare(img, 'download_share', e)}
+                          className="p-1 hover:bg-sky-600/20 text-sky-400 rounded-full transition-colors cursor-pointer animate-pulse"
+                          title="تحميل ومشاركة الصورة كملف"
+                        >
+                          <Share2 className="w-3.5 h-3.5" />
+                        </button>
                         <button 
                           onClick={(e) => handleShare(img, 'whatsapp', e)}
                           className="p-1 hover:bg-emerald-600/20 text-emerald-400 rounded-full transition-colors cursor-pointer"
-                          title="مشاركة عبر واتساب"
+                          title="تنزيل ومشاركة عبر واتساب"
                         >
                           <MessageCircle className="w-3.5 h-3.5" />
                         </button>
                         <button 
                           onClick={(e) => handleShare(img, 'facebook', e)}
                           className="p-1 hover:bg-blue-600/20 text-blue-400 rounded-full transition-colors cursor-pointer"
-                          title="مشاركة عبر فيسبوك"
+                          title="تنزيل ومشاركة عبر فيسبوك"
                         >
                           <Facebook className="w-3.5 h-3.5" />
                         </button>
@@ -1740,31 +2038,38 @@ export default function App() {
                             
                             {/* أزرار المشاركة السريعة */}
                             <div 
-                              className="flex items-center gap-1.5 bg-slate-900/95 border border-slate-700/50 px-2 py-1 rounded-xl shadow-md" 
+                              className="flex items-center gap-1 bg-slate-900/95 border border-slate-700/50 px-1.5 py-1 rounded-xl shadow-md" 
                               onClick={(e) => e.stopPropagation()}
                               id={`catalog-item-share-${index}`}
                             >
-                              <span className="text-[9px] text-slate-300 font-bold font-sans">مشاركة:</span>
+                              <span className="text-[8px] text-slate-300 font-bold font-sans">تحميل ومشاركة:</span>
+                              <button 
+                                onClick={(e) => handleShare(img, 'download_share', e)}
+                                className="p-0.5 hover:bg-sky-600/20 text-sky-400 rounded-full transition-colors cursor-pointer animate-pulse"
+                                title="تحميل ومشاركة الصورة كملف"
+                              >
+                                <Share2 className="w-3 h-3" />
+                              </button>
                               <button 
                                 onClick={(e) => handleShare(img, 'whatsapp', e)}
                                 className="p-0.5 hover:bg-emerald-600/20 text-emerald-400 rounded-full transition-colors cursor-pointer"
-                                title="مشاركة عبر واتساب"
+                                title="تنزيل ومشاركة عبر واتساب"
                               >
-                                <MessageCircle className="w-3.5 h-3.5" />
+                                <MessageCircle className="w-3 h-3" />
                               </button>
                               <button 
                                 onClick={(e) => handleShare(img, 'facebook', e)}
                                 className="p-0.5 hover:bg-blue-600/20 text-blue-400 rounded-full transition-colors cursor-pointer"
-                                title="مشاركة عبر فيسبوك"
+                                title="تنزيل ومشاركة عبر فيسبوك"
                               >
-                                <Facebook className="w-3.5 h-3.5" />
+                                <Facebook className="w-3 h-3" />
                               </button>
                               <button 
                                 onClick={(e) => handleShare(img, 'copy', e)}
                                 className="p-0.5 hover:bg-slate-700 text-slate-300 rounded-full transition-colors cursor-pointer"
                                 title="نسخ رابط الصورة"
                               >
-                                <Copy className="w-3.5 h-3.5" />
+                                <Copy className="w-3 h-3" />
                               </button>
                             </div>
                           </div>
@@ -2124,29 +2429,37 @@ export default function App() {
               )}
 
               {/* شريط المشاركة في المعاينة التكبيرية */}
-              <div className="absolute top-[-44px] left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-slate-700/50 flex items-center gap-3 shadow-lg z-20">
-                <span className="text-slate-300 text-xs font-bold font-sans flex items-center gap-1.5 shrink-0">
+              <div className="absolute top-[-44px] left-1/2 transform -translate-x-1/2 bg-slate-900/90 backdrop-blur-md px-4 py-1.5 rounded-full border border-slate-700/50 flex items-center gap-2.5 shadow-lg z-20">
+                <span className="text-slate-300 text-xs font-bold font-sans flex items-center gap-1 shrink-0">
                   <Share2 className="w-3.5 h-3.5 text-sky-400" />
-                  <span className="hidden xs:inline">مشاركة الصورة:</span>
+                  <span className="hidden xs:inline">تحميل ومشاركة:</span>
                 </span>
                 <button 
-                  onClick={() => handleShare(lightboxImages[lightboxIndex], 'whatsapp')}
+                  onClick={() => handleShare(lightboxImages[lightboxIndex!], 'download_share')}
+                  className="flex items-center gap-1 text-xs text-sky-400 hover:text-white bg-sky-500/10 hover:bg-sky-600 px-3 py-1 rounded-full transition-all duration-200 cursor-pointer font-bold shrink-0 animate-pulse"
+                  title="تحميل ومشاركة الصورة كملف"
+                >
+                  <Share2 className="w-3.5 h-3.5" />
+                  <span>تحميل ومشاركة كملف</span>
+                </button>
+                <button 
+                  onClick={() => handleShare(lightboxImages[lightboxIndex!], 'whatsapp')}
                   className="flex items-center gap-1 text-xs text-emerald-400 hover:text-white bg-emerald-500/10 hover:bg-emerald-600 px-2.5 py-1 rounded-full transition-all duration-200 cursor-pointer font-bold shrink-0"
-                  title="مشاركة عبر واتساب"
+                  title="تنزيل ومشاركة عبر واتساب"
                 >
                   <MessageCircle className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">واتساب</span>
                 </button>
                 <button 
-                  onClick={() => handleShare(lightboxImages[lightboxIndex], 'facebook')}
+                  onClick={() => handleShare(lightboxImages[lightboxIndex!], 'facebook')}
                   className="flex items-center gap-1 text-xs text-blue-400 hover:text-white bg-blue-500/10 hover:bg-blue-600 px-2.5 py-1 rounded-full transition-all duration-200 cursor-pointer font-bold shrink-0"
-                  title="مشاركة عبر فيسبوك"
+                  title="تنزيل ومشاركة عبر فيسبوك"
                 >
                   <Facebook className="w-3.5 h-3.5" />
                   <span className="hidden sm:inline">فيسبوك</span>
                 </button>
                 <button 
-                  onClick={() => handleShare(lightboxImages[lightboxIndex], 'copy')}
+                  onClick={() => handleShare(lightboxImages[lightboxIndex!], 'copy')}
                   className="flex items-center gap-1 text-xs text-slate-300 hover:text-white bg-slate-700/50 hover:bg-slate-600 px-2.5 py-1 rounded-full transition-all duration-200 cursor-pointer font-bold shrink-0"
                   title="نسخ الرابط"
                 >

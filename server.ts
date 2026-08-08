@@ -146,6 +146,24 @@ async function syncFromCloud() {
   }
 }
 
+async function triggerVercelDeploy() {
+  const hookUrl = 'https://api.vercel.com/v1/integrations/deploy/prj_6Y1HYJ9dpddgSAMkej2wZ0AXeTh1/cFtkq4qZfF';
+  
+  try {
+    const response = await fetch(hookUrl, {
+      method: 'POST'
+    });
+    
+    if (response.ok) {
+      console.log('تم إرسال أمر التحديث بنجاح، الموقع هيتحدث كمان ثواني.');
+    } else {
+      console.log('فشل إرسال أمر التحديث.');
+    }
+  } catch (error) {
+    console.error('حصل خطأ:', error);
+  }
+}
+
 async function syncToCloud(key: 'gallery' | 'catalog', data: any) {
   try {
     console.log(`📤 Backing up ${key} to cloud (kvdb.io)...`);
@@ -196,6 +214,8 @@ app.post("/api/gallery", async (req, res) => {
     if (success) {
       // Back up to cloud asynchronously so it doesn't block the API response
       syncToCloud('gallery', updatedPhotos).catch(err => console.error("Async gallery sync failed:", err));
+      // Trigger Vercel Deploy Hook automatically
+      triggerVercelDeploy().catch(err => console.error("Async Vercel deploy trigger failed:", err));
     }
     res.json({ success, data: updatedPhotos });
   } catch (error) {
@@ -221,6 +241,8 @@ app.post("/api/catalog", async (req, res) => {
     if (success) {
       // Back up to cloud asynchronously so it doesn't block the API response
       syncToCloud('catalog', processedCatalog).catch(err => console.error("Async catalog sync failed:", err));
+      // Trigger Vercel Deploy Hook automatically
+      triggerVercelDeploy().catch(err => console.error("Async Vercel deploy trigger failed:", err));
     }
     res.json({ success, data: processedCatalog });
   } catch (error) {

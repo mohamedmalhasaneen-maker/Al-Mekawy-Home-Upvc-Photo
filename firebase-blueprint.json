@@ -1,0 +1,56 @@
+{
+  "entities": {
+    "Photo": {
+      "title": "Photo",
+      "description": "Product showcase photo stored in Firebase Storage with metadata in Firestore",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the photo"
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Download URL of the photo in Firebase Storage",
+          "maxLength": 2048
+        },
+        "storagePath": {
+          "type": "string",
+          "description": "Path of the file inside Firebase Storage bucket",
+          "maxLength": 512
+        },
+        "category": {
+          "type": "string",
+          "description": "Category of the product",
+          "enum": ["windows", "doors", "balconies"]
+        },
+        "title": {
+          "type": "string",
+          "description": "Title or description of the product photo",
+          "maxLength": 200
+        },
+        "order": {
+          "type": "number",
+          "description": "Display order index"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Creation timestamp in ISO format or server time",
+          "maxLength": 64
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Last update timestamp",
+          "maxLength": 64
+        }
+      },
+      "required": ["imageUrl", "storagePath", "category"]
+    }
+  },
+  "firestore": {
+    "/photos/{photoId}": {
+      "schema": "Photo",
+      "description": "Collection of UPVC product showcase photos"
+    }
+  }
+}

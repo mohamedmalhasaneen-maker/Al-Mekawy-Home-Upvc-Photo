@@ -1,0 +1,6 @@
+{
+  "name": "Al Mekawy Home UPVC Photo",
+  "description": "معرض صور منتجات Al-Mekawy Home UPVC للشبابيك والأبواب والبلكونات بتخزين سحابي فوري",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

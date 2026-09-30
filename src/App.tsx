@@ -250,20 +250,6 @@ export default function App() {
         </div>
       </footer>
 
-      {/* Floating WhatsApp Quick Action Button */}
-      <a
-        href="https://wa.me/?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%A3%D8%B3%D8%AA%D9%81%D8%B3%D8%B1%20%D8%B9%D9%86%20%D8%AA%D8%B5%D9%85%D9%8A%D9%85%D8%A7%D8%AA%20Al-Mekawy%20Home%20UPVC"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="تواصل مباشر عبر واتساب"
-        className="fixed bottom-6 left-6 z-30 flex items-center gap-2.5 px-4 py-3 rounded-full bg-emerald-600 hover:bg-emerald-500 text-white shadow-xl shadow-emerald-600/30 border border-emerald-400/40 transition-all transform hover:scale-105 active:scale-95"
-      >
-        <MessageSquare className="w-5 h-5 fill-white text-emerald-600" />
-        <span className="text-xs sm:text-sm font-bold hidden sm:inline">
-          تواصل مع Al-Mekawy UPVC
-        </span>
-      </a>
-
       {/* Lightbox Modal */}
       <PhotoLightbox
         photos={filteredPhotos}

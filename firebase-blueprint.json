@@ -2,7 +2,7 @@
   "entities": {
     "Photo": {
       "title": "Photo",
-      "description": "Product showcase photo stored in Firebase Storage with metadata in Firestore",
+      "description": "Product showcase photo with metadata and cloud image URL stored in Firestore",
       "type": "object",
       "properties": {
         "id": {
@@ -11,13 +11,13 @@
         },
         "imageUrl": {
           "type": "string",
-          "description": "Download URL of the photo in Firebase Storage",
-          "maxLength": 2048
+          "description": "Permanent cloud image URL or central image data",
+          "maxLength": 1048576
         },
         "storagePath": {
           "type": "string",
-          "description": "Path of the file inside Firebase Storage bucket",
-          "maxLength": 512
+          "description": "Path or identifier in cloud storage",
+          "maxLength": 1024
         },
         "category": {
           "type": "string",
@@ -27,7 +27,7 @@
         "title": {
           "type": "string",
           "description": "Title or description of the product photo",
-          "maxLength": 200
+          "maxLength": 500
         },
         "order": {
           "type": "number",
@@ -35,7 +35,7 @@
         },
         "createdAt": {
           "type": "string",
-          "description": "Creation timestamp in ISO format or server time",
+          "description": "Creation timestamp in ISO format",
           "maxLength": 64
         },
         "updatedAt": {
@@ -45,12 +45,27 @@
         }
       },
       "required": ["imageUrl", "storagePath", "category"]
+    },
+    "PhotoData": {
+      "title": "PhotoData",
+      "description": "High resolution permanent image data payload in Firestore",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "data": { "type": "string", "maxLength": 1048576 },
+        "createdAt": { "type": "string", "maxLength": 64 }
+      },
+      "required": ["data"]
     }
   },
   "firestore": {
     "/photos/{photoId}": {
       "schema": "Photo",
       "description": "Collection of UPVC product showcase photos"
+    },
+    "/photos_data/{photoId}": {
+      "schema": "PhotoData",
+      "description": "Collection of cloud image data payloads"
     }
   }
 }

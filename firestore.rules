@@ -14,10 +14,6 @@ service cloud.firestore {
       return request.resource.data;
     }
 
-    function existing() {
-      return resource.data;
-    }
-
     function isValidCategory(cat) {
       return cat == 'windows' || cat == 'doors' || cat == 'balconies';
     }
@@ -25,23 +21,39 @@ service cloud.firestore {
     function isValidPhoto(data) {
       return data.keys().hasAll(['imageUrl', 'storagePath', 'category']) &&
         data.keys().hasOnly(['id', 'imageUrl', 'storagePath', 'category', 'title', 'order', 'createdAt', 'updatedAt']) &&
-        data.imageUrl is string && data.imageUrl.size() <= 2048 &&
-        data.storagePath is string && data.storagePath.size() <= 512 &&
+        data.imageUrl is string && data.imageUrl.size() <= 1048576 &&
+        data.storagePath is string && data.storagePath.size() <= 1024 &&
         isValidCategory(data.category) &&
-        (!('title' in data) || (data.title is string && data.title.size() <= 200)) &&
+        (!('title' in data) || (data.title is string && data.title.size() <= 500)) &&
         (!('order' in data) || data.order is number) &&
         (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
         (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64)) &&
         (!('updatedAt' in data) || (data.updatedAt is string && data.updatedAt.size() <= 64));
     }
 
+    function isValidPhotoData(data) {
+      return data.keys().hasAll(['data']) &&
+        data.keys().hasOnly(['id', 'data', 'createdAt']) &&
+        data.data is string && data.data.size() <= 1048576 &&
+        (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&
+        (!('createdAt' in data) || (data.createdAt is string && data.createdAt.size() <= 64));
+    }
+
     match /photos/{photoId} {
-      // All customers worldwide can view UPVC catalog photos
+      // All clients worldwide can read and stream UPVC catalog photos
       allow get, list: if true;
 
-      // Allow photo management with strict payload and ID validation
+      // Allow photo creation, update, delete with validation
       allow create: if isValidId(photoId) && isValidPhoto(incoming());
       allow update: if isValidId(photoId) && isValidPhoto(incoming());
+      allow delete: if isValidId(photoId);
+    }
+
+    match /photos_data/{photoId} {
+      // High-res permanent image data collection
+      allow get, list: if true;
+      allow create: if isValidId(photoId) && isValidPhotoData(incoming());
+      allow update: if isValidId(photoId) && isValidPhotoData(incoming());
       allow delete: if isValidId(photoId);
     }
   }

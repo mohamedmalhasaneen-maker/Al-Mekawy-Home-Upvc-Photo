@@ -12,57 +12,81 @@ import {
 import { db, handleFirestoreError, OperationType } from '../firebase/config';
 import { PhotoItem, PhotoCategory } from '../types/photo';
 
-/**
- * Optimizes and converts an image file to Base64 string client-side.
- */
-export async function fileToBase64(file: File, maxDimension = 1920, quality = 0.88): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const img = new Image();
-      img.onload = () => {
-        let { width, height } = img;
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-          ctx.drawImage(img, 0, 0, width, height);
-          const dataUrl = canvas.toDataURL('image/jpeg', quality);
-          resolve(dataUrl);
-        } else {
-          resolve(e.target?.result as string);
-        }
-      };
-      img.onerror = () => resolve(e.target?.result as string);
-      img.src = e.target?.result as string;
-    };
-    reader.onerror = (err) => reject(err);
-    reader.readAsDataURL(file);
-  });
-}
+export const CLOUDINARY_CLOUD_NAME = 'obvb7rtp';
+export const CLOUDINARY_UPLOAD_PRESET = 'AI-Mekawy Home';
+export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD_NAME}/image/upload`;
 
 export interface UploadPhotoParams {
   file: File;
   category: PhotoCategory;
   title: string;
-  onProgress?: (percent: number) => void;
+  onProgress?: (percent: number, stepText?: string) => void;
 }
 
 /**
- * Uploads a photo to Cloud Storage via backend API, then stores its metadata document in Firestore.
+ * Uploads a file directly to Cloudinary using the unsigned upload preset.
+ * Attempts the exact requested preset ("AI-Mekawy Home"), and gracefully
+ * handles the minor Latin I vs l variant ("Al-Mekawy Home") if needed,
+ * while printing full diagnostic details to the console on any failure.
+ */
+async function uploadToCloudinary(
+  file: File,
+  onProgress?: (percent: number, stepText?: string) => void
+): Promise<{ secure_url: string; public_id: string }> {
+  const tryUpload = async (presetName: string) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('upload_preset', presetName);
+
+    console.log(`[Cloudinary Upload] Initiating upload to ${CLOUDINARY_UPLOAD_URL} with preset "${presetName}"...`);
+
+    const response = await fetch(CLOUDINARY_UPLOAD_URL, {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok || !data || !data.secure_url) {
+      const errorMsg = data?.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+      console.error(`[Cloudinary Upload Error] (Preset: "${presetName}"):`, data?.error || data || response.statusText);
+      const err = new Error(errorMsg);
+      (err as any).cloudinaryData = data;
+      (err as any).status = response.status;
+      throw err;
+    }
+
+    return {
+      secure_url: data.secure_url as string,
+      public_id: data.public_id as string,
+    };
+  };
+
+  if (onProgress) onProgress(30, 'جاري رفع الصورة مباشرة إلى Cloudinary...');
+
+  try {
+    const result = await tryUpload(CLOUDINARY_UPLOAD_PRESET);
+    console.log('[Cloudinary Upload Success]:', result.secure_url);
+    return result;
+  } catch (primaryErr: any) {
+    // If the exact preset name has a visual font typo (Capital I vs small l in Al/AI), test fallback
+    if (primaryErr?.message?.includes('Upload preset not found')) {
+      console.warn(`[Cloudinary Upload] Preset "${CLOUDINARY_UPLOAD_PRESET}" not found. Trying "Al-Mekawy Home"...`);
+      try {
+        const fallbackResult = await tryUpload('Al-Mekawy Home');
+        console.log('[Cloudinary Upload Fallback Success]:', fallbackResult.secure_url);
+        return fallbackResult;
+      } catch (fallbackErr) {
+        console.error('[Cloudinary Upload Fallback Failed]:', fallbackErr);
+        throw primaryErr;
+      }
+    }
+    throw primaryErr;
+  }
+}
+
+/**
+ * Uploads photo directly to Cloudinary -> gets secure_url -> stores document in Firestore
  */
 export async function uploadProductPhoto({
   file,
@@ -74,80 +98,26 @@ export async function uploadProductPhoto({
   const randomSuffix = Math.random().toString(36).substring(2, 8);
   const docId = `photo_${timestamp}_${randomSuffix}`;
 
-  if (onProgress) onProgress(15);
-
-  // 1. Convert & optimize file to base64
-  const base64Data = await fileToBase64(file);
-  if (onProgress) onProgress(35);
-
-  // 2. Upload to Cloud Storage API endpoint
-  let uploadResult: { imageUrl: string; storagePath: string };
-
+  // 1. Direct upload to Cloudinary
+  if (onProgress) onProgress(20, 'جاري الاتصال بسحابة Cloudinary...');
+  
+  let cloudinaryResult: { secure_url: string; public_id: string };
   try {
-    if (onProgress) onProgress(55);
-
-    const response = await fetch('/api/upload', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        imageBase64: base64Data,
-        filename: file.name,
-        category,
-        title,
-      }),
-    });
-
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(errJson.error || `Upload failed with status ${response.status}`);
-    }
-
-    const data = await response.json();
-    if (!data.imageUrl) {
-      throw new Error('لم يتم استلام رابط الصورة من السحابة');
-    }
-
-    uploadResult = {
-      imageUrl: data.imageUrl,
-      storagePath: data.storagePath || `cloud_${timestamp}`,
-    };
-
-    if (onProgress) onProgress(85);
-  } catch (apiError: any) {
-    console.warn('Backend upload API error, attempting direct Cloudinary fallback:', apiError);
-
-    // Direct fallback to Cloudinary / ImgBB if needed
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('upload_preset', 'almekawy_upvc');
-
-      const directRes = await fetch('https://api.cloudinary.com/v1_1/dxk0bmhks/image/upload', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (directRes.ok) {
-        const directData = await directRes.json();
-        uploadResult = {
-          imageUrl: directData.secure_url,
-          storagePath: directData.public_id || `cloudinary_${timestamp}`,
-        };
-      } else {
-        throw new Error(apiError.message || 'فشل رفع الصورة إلى التخزين السحابي');
-      }
-    } catch (fallbackError) {
-      throw new Error(apiError.message || 'فشل رفع الصورة إلى السحابة. يرجى المحاولة مرة أخرى.');
-    }
+    cloudinaryResult = await uploadToCloudinary(file, onProgress);
+  } catch (uploadError: any) {
+    console.error('Fatal Cloudinary Error during upload:', uploadError);
+    throw new Error(
+      `خطأ في الرفع إلى Cloudinary: ${uploadError?.message || 'تعذر الوصول إلى سحابة Cloudinary'}`
+    );
   }
 
-  // 3. Save metadata to Cloud Firestore
-  const photoData: PhotoItem = {
+  if (onProgress) onProgress(75, 'تم الحصول على رابط Cloudinary. جاري الحفظ في Firestore...');
+
+  // 2. Save document directly to Firebase Firestore
+  const photoItem: PhotoItem = {
     id: docId,
-    imageUrl: uploadResult.imageUrl,
-    storagePath: uploadResult.storagePath,
+    imageUrl: cloudinaryResult.secure_url,
+    storagePath: cloudinaryResult.public_id,
     category,
     title: title.trim() || getDefaultTitle(category),
     order: timestamp,
@@ -156,10 +126,13 @@ export async function uploadProductPhoto({
   };
 
   try {
-    await setDoc(doc(db, 'photos', docId), photoData);
-    if (onProgress) onProgress(100);
-    return photoData;
+    console.log(`[Firestore Write] Saving photo document "${docId}" in collection "photos"...`, photoItem);
+    await setDoc(doc(db, 'photos', docId), photoItem);
+    console.log(`[Firestore Write Success] Photo "${docId}" saved successfully.`);
+    if (onProgress) onProgress(100, 'تم رفع وحفظ الصورة بنجاح ✓');
+    return photoItem;
   } catch (firestoreError) {
+    console.error('Firestore save failed:', firestoreError);
     handleFirestoreError(firestoreError, OperationType.CREATE, `photos/${docId}`);
     throw firestoreError;
   }
@@ -179,36 +152,22 @@ function getDefaultTitle(category: PhotoCategory): string {
 }
 
 /**
- * Deletes photo from both Cloud Storage and Firestore.
+ * Deletes photo permanently from Firestore
  */
 export async function deleteProductPhoto(photo: PhotoItem): Promise<void> {
-  // 1. Delete from Cloud Storage via backend
   try {
-    await fetch('/api/delete', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        storagePath: photo.storagePath,
-        publicId: photo.storagePath,
-      }),
-    });
-  } catch (storageErr) {
-    console.warn('Cloud storage delete notice:', storageErr);
-  }
-
-  // 2. Delete document from Firestore
-  try {
+    console.log(`[Firestore Delete] Deleting photo document "${photo.id}"...`);
     await deleteDoc(doc(db, 'photos', photo.id));
+    console.log(`[Firestore Delete Success] Photo "${photo.id}" deleted.`);
   } catch (error) {
+    console.error('Firestore delete failed:', error);
     handleFirestoreError(error, OperationType.DELETE, `photos/${photo.id}`);
     throw error;
   }
 }
 
 /**
- * Updates metadata (title, category, order) in Firestore.
+ * Updates metadata (title, category, order) in Firestore
  */
 export async function updatePhotoMetadata(
   photoId: string,
@@ -226,7 +185,7 @@ export async function updatePhotoMetadata(
 }
 
 /**
- * Subscribes in real-time to all photos from Firestore.
+ * Subscribes in real-time to all photos from Firestore
  */
 export function subscribeToPhotos(
   onUpdate: (photos: PhotoItem[]) => void,

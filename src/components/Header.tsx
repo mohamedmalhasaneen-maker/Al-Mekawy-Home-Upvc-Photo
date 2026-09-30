@@ -42,18 +42,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action buttons */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Quick WhatsApp Inquiry */}
-            <a
-              href="https://wa.me/?text=%D9%85%D8%B1%D8%AD%D8%A8%D8%A7%D8%8C%20%D8%A3%D8%B3%D8%AA%D9%81%D8%B3%D8%B1%20%D8%B9%D9%86%20%D9%85%D9%86%D8%AA%D8%AC%D8%A7%D8%AA%20Al-Mekawy%20Home%20UPVC"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="تواصل عبر واتساب"
-              className="hidden md:inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-400 border border-emerald-500/30 text-xs font-bold transition-all"
-            >
-              <MessageSquare className="w-4 h-4 text-emerald-400" />
-              <span>واتساب للطلب والاستفسار</span>
-            </a>
-
             {/* Admin Dashboard Button */}
             <button
               onClick={onOpenAdmin}

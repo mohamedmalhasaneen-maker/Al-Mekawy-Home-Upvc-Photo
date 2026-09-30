@@ -4,6 +4,8 @@ import {
   uploadProductPhoto,
   deleteProductPhoto,
   updatePhotoMetadata,
+  CLOUDINARY_CLOUD_NAME,
+  CLOUDINARY_UPLOAD_PRESET,
 } from '../services/photoService';
 import {
   X,
@@ -13,15 +15,12 @@ import {
   Edit3,
   CheckCircle2,
   AlertCircle,
-  Image as ImageIcon,
   Layers,
   Lock,
   LogOut,
   RefreshCw,
-  Eye,
-  Info,
+  Cloud,
   ExternalLink,
-  Sparkles,
 } from 'lucide-react';
 import { auth, firebaseConfig } from '../firebase/config';
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
@@ -57,8 +56,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [uploadTitle, setUploadTitle] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadStepText, setUploadStepText] = useState('');
   const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [uploadErrorMessage, setUploadErrorMessage] = useState('');
+  const [errorDetails, setErrorDetails] = useState('');
+  const [lastUploadedUrl, setLastUploadedUrl] = useState<string | null>(null);
 
   // Delete modal state
   const [photoToDelete, setPhotoToDelete] = useState<PhotoItem | null>(null);
@@ -74,7 +76,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Admin PIN login (Quick access PIN "1234" or "admin123" or custom)
+  // Handle Admin PIN login (PIN "1234")
   const handlePinLogin = (e: React.FormEvent) => {
     e.preventDefault();
     if (pinInput === '1234' || pinInput === 'admin123' || pinInput.toLowerCase() === 'upvc') {
@@ -95,9 +97,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       await signInWithPopup(auth, provider);
       setIsAdmin(true);
     } catch (err: any) {
-      console.warn('Google Sign-in popup fallback:', err);
-      // If popup is blocked in iframe, prompt PIN
-      setPinError('تعذر فتح تسجيل الدخول عبر Google في نافذة المعاينة، يرجى استخدام الرمز الافتراضي: 1234');
+      console.warn('Google Sign-in notice:', err);
+      setPinError('يمكنك استخدام رمز المرور المباشر: 1234');
     } finally {
       setAuthLoading(false);
     }
@@ -117,6 +118,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setSelectedFile(file);
       setUploadStatus('idle');
       setUploadErrorMessage('');
+      setErrorDetails('');
+      setLastUploadedUrl(null);
       const reader = new FileReader();
       reader.onload = () => {
         setFilePreview(reader.result as string);
@@ -132,6 +135,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setSelectedFile(file);
       setUploadStatus('idle');
       setUploadErrorMessage('');
+      setErrorDetails('');
+      setLastUploadedUrl(null);
       const reader = new FileReader();
       reader.onload = () => {
         setFilePreview(reader.result as string);
@@ -150,21 +155,26 @@ export const AdminModal: React.FC<AdminModalProps> = ({
     }
 
     setIsUploading(true);
-    setUploadProgress(0);
+    setUploadProgress(10);
+    setUploadStepText('جاري بدء الاتصال بسحابة Cloudinary...');
     setUploadStatus('idle');
     setUploadErrorMessage('');
+    setErrorDetails('');
+    setLastUploadedUrl(null);
 
     try {
-      await uploadProductPhoto({
+      const createdItem = await uploadProductPhoto({
         file: selectedFile,
         category: uploadCategory,
         title: uploadTitle,
-        onProgress: (percent) => {
+        onProgress: (percent, stepText) => {
           setUploadProgress(percent);
+          if (stepText) setUploadStepText(stepText);
         },
       });
 
       setUploadStatus('success');
+      setLastUploadedUrl(createdItem.imageUrl);
       setSelectedFile(null);
       setFilePreview(null);
       setUploadTitle('');
@@ -172,13 +182,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         fileInputRef.current.value = '';
       }
     } catch (err: any) {
-      console.error('Upload error:', err);
+      console.error('Upload Error Detailed:', err);
       setUploadStatus('error');
-      setUploadErrorMessage(
-        err?.message?.includes('storage/unauthorized')
-          ? 'تم رفض الرفع من قبل Firebase Storage. تأكد من إعداد صلاحيات Firebase Storage في الـ Console.'
-          : 'فشل رفع الصورة، حاول مرة أخرى.'
-      );
+      setUploadErrorMessage(err?.message || 'فشل رفع الصورة إلى Cloudinary.');
+      setErrorDetails(err?.stack || JSON.stringify(err, null, 2) || String(err));
     } finally {
       setIsUploading(false);
     }
@@ -193,7 +200,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       setPhotoToDelete(null);
     } catch (err) {
       console.error('Delete error:', err);
-      alert('حدث خطأ أثناء حذف الصورة من السحابة.');
+      alert('حدث خطأ أثناء حذف الصورة من قاعدة البيانات.');
     } finally {
       setIsDeleting(false);
     }
@@ -223,8 +230,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       : photos.filter((p) => p.category === manageCategoryFilter);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-4xl max-h-[90vh] bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-right">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-4xl max-h-[92vh] bg-slate-900 border border-slate-700/80 rounded-3xl shadow-2xl flex flex-col overflow-hidden text-right">
         {/* Header */}
         <div className="p-5 sm:p-6 border-b border-slate-800 flex items-center justify-between bg-slate-950/60">
           <div className="flex items-center gap-3">
@@ -236,7 +243,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 لوحة تحكم المشرف — Al Mekawy Home UPVC
               </h3>
               <p className="text-xs text-slate-400">
-                إدارة ورفع صور المنتجات وتخزينها السحابي الدائم
+                رفع دائم عبر Cloudinary ومزامنة فورية عبر Firestore
               </p>
             </div>
           </div>
@@ -260,7 +267,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
                 <h4 className="text-lg font-bold text-white mb-1">تسجيل دخول المشرف</h4>
                 <p className="text-xs text-slate-400">
-                  لوحة الإدارة مخصصة فقط لمشرف شركة Al-Mekawy Home UPVC لرفع وحذف وتعديل الصور
+                  لوحة الإدارة مخصصة فقط لمشرف شركة Al-Mekawy Home UPVC
                 </p>
               </div>
 
@@ -305,24 +312,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   disabled={authLoading}
                   className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs sm:text-sm border border-slate-700 flex items-center justify-center gap-2 transition-all"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24">
-                    <path
-                      fill="#EA4335"
-                      d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5z"
-                    />
-                    <path
-                      fill="#4285F4"
-                      d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.6 14.8c-.2-.7-.4-1.5-.4-2.3s.2-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.2s.7 5.5 1.9 7.9l3.7-2.9c-.2-.8-.4-1.6-.4-2.4z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23.5c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2-6.4-4.8L1.9 16.9C3.7 20.6 7.5 23.5 12 23.5z"
-                    />
-                  </svg>
                   <span>تسجيل الدخول باستخدام Google</span>
                 </button>
               </form>
@@ -330,9 +319,25 @@ export const AdminModal: React.FC<AdminModalProps> = ({
           ) : (
             /* Admin Panel Dashboard */
             <div>
+              {/* Cloudinary Status Bar */}
+              <div className="mb-5 p-3 rounded-2xl bg-blue-950/30 border border-blue-800/40 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2">
+                  <Cloud className="w-4 h-4 text-blue-400" />
+                  <span className="text-slate-300">سحابة الصور:</span>
+                  <span className="font-mono text-blue-300 font-bold">Cloudinary ({CLOUDINARY_CLOUD_NAME})</span>
+                  <span className="text-slate-500">•</span>
+                  <span className="text-slate-400">Preset:</span>
+                  <span className="font-mono text-emerald-400 font-semibold">{CLOUDINARY_UPLOAD_PRESET}</span>
+                </div>
+                <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>جاهز ومفعل للرفع الدائم</span>
+                </div>
+              </div>
+
               {/* Top Admin Controls & Tabs */}
               <div className="flex flex-wrap items-center justify-between gap-3 mb-6 bg-slate-950/60 p-2 rounded-2xl border border-slate-800">
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <button
                     onClick={() => setActiveTab('upload')}
                     className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold transition-all ${
@@ -359,11 +364,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-emerald-400 flex items-center gap-1 font-semibold px-2.5 py-1 rounded-lg bg-emerald-950/40 border border-emerald-800/40">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>سحابي متصل</span>
-                  </span>
-
                   <button
                     onClick={handleLogout}
                     className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-red-900/40 text-slate-300 hover:text-red-300 border border-slate-700 hover:border-red-700/50 text-xs font-bold transition-colors"
@@ -415,7 +415,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         type="text"
                         value={uploadTitle}
                         onChange={(e) => setUploadTitle(e.target.value)}
-                        placeholder="مثال: شباك جرار 2 ضلفة دبل جلاس عازل للصوت"
+                        placeholder="مثال: شباك جرار دبل قطاع جامبو عازل للصوت"
                         className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 text-sm"
                       />
                     </div>
@@ -473,7 +473,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                                 اضغط لاختيار صورة من جهازك أو اسحبها هنا
                               </p>
                               <p className="text-xs text-slate-500 mt-0.5">
-                                يدعم JPG، PNG، WEBP (يتم رفعها مباشرة إلى Firebase Storage)
+                                يتم الرفع مباشرة إلى سحابة Cloudinary للحصول على رابط دائم وتخزينه في Firestore
                               </p>
                             </div>
                           </div>
@@ -487,7 +487,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         <div className="flex items-center justify-between text-xs font-bold text-blue-300">
                           <span className="flex items-center gap-2">
                             <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
-                            <span>جاري رفع الصورة إلى التخزين السحابي...</span>
+                            <span>{uploadStepText || 'جاري الرفع إلى Cloudinary...'}</span>
                           </span>
                           <span>{uploadProgress}%</span>
                         </div>
@@ -502,24 +502,47 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
                     {/* Success Message */}
                     {uploadStatus === 'success' && (
-                      <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 text-sm flex items-center gap-2.5">
-                        <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
-                        <div>
-                          <p className="font-bold">تم رفع الصورة بنجاح ✓</p>
-                          <p className="text-xs text-emerald-400/80">
-                            تم حفظ الصورة في التخزين السحابي وحفظ بياناتها في Firestore، وستظهر فوراً لجميع العملاء.
-                          </p>
+                      <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/50 text-emerald-300 text-sm space-y-2">
+                        <div className="flex items-center gap-2.5">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+                          <div>
+                            <p className="font-bold">تم رفع الصورة بنجاح إلى Cloudinary وحفظها في Firestore ✓</p>
+                            <p className="text-xs text-emerald-400/80">
+                              الصورة الآن محفوظة برابط دائم وتظهر مباشرة في المعرض لجميع العملاء في أي مكان.
+                            </p>
+                          </div>
                         </div>
+                        {lastUploadedUrl && (
+                          <div className="mt-2 pt-2 border-t border-emerald-800/40 flex items-center justify-between text-xs">
+                            <span className="text-emerald-400 font-mono truncate max-w-xs sm:max-w-md">
+                              {lastUploadedUrl}
+                            </span>
+                            <a
+                              href={lastUploadedUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1 text-emerald-300 hover:text-white font-bold underline"
+                            >
+                              <span>فتح الرابط</span>
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          </div>
+                        )}
                       </div>
                     )}
 
-                    {/* Error Message */}
+                    {/* Detailed Error Message */}
                     {uploadStatus === 'error' && (
-                      <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/50 text-red-300 text-sm flex items-center gap-2.5">
-                        <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
-                        <div>
-                          <p className="font-bold">{uploadErrorMessage || 'فشل رفع الصورة، حاول مرة أخرى.'}</p>
+                      <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/50 text-red-300 text-sm space-y-2">
+                        <div className="flex items-center gap-2.5">
+                          <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                          <p className="font-bold">{uploadErrorMessage}</p>
                         </div>
+                        {errorDetails && (
+                          <div className="p-2.5 bg-black/40 rounded-lg text-xs font-mono text-red-300 overflow-x-auto ltr text-left">
+                            <pre className="whitespace-pre-wrap">{errorDetails}</pre>
+                          </div>
+                        )}
                       </div>
                     )}
 
@@ -591,7 +614,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                               <img
                                 src={photo.imageUrl}
                                 alt={photo.title}
-                                className="w-16 h-16 object-cover rounded-xl border border-slate-700 shrink-0"
+                                className="w-16 h-16 object-cover rounded-xl border border-slate-700 shrink-0 bg-slate-900"
                               />
                               <div>
                                 <h5 className="text-sm font-bold text-white line-clamp-1">
@@ -629,7 +652,7 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                               <button
                                 onClick={() => setPhotoToDelete(photo)}
                                 className="flex items-center gap-1 px-3 py-2 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-300 border border-red-800/40 text-xs font-semibold transition-colors"
-                                title="حذف من التخزين وقاعدة البيانات"
+                                title="حذف من قاعدة البيانات"
                               >
                                 <Trash2 className="w-3.5 h-3.5 text-red-400" />
                                 <span className="hidden sm:inline">حذف</span>
@@ -649,11 +672,11 @@ export const AdminModal: React.FC<AdminModalProps> = ({
         {/* Footer info */}
         <div className="p-4 bg-slate-950 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
           <div className="flex items-center gap-2">
-            <span>Firebase Project ID:</span>
+            <span>Firebase Project:</span>
             <span className="font-mono text-slate-400">{firebaseConfig.projectId}</span>
           </div>
           <div className="text-[11px] text-slate-500">
-            Al Mekawy Home UPVC Cloud Storage System
+            Al Mekawy Home UPVC Cloudinary Storage System
           </div>
         </div>
       </div>
@@ -668,14 +691,14 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
             <h4 className="text-lg font-bold text-white mb-2">تأكيد حذف الصورة</h4>
             <p className="text-xs sm:text-sm text-slate-400 mb-4">
-              هل أنت متأكد من حذف هذه الصورة؟ سيتم حذف الملف نهائياً من التخزين السحابي وحذف بياناتها من <b>Firestore</b> ولن تظهر لأي عميل.
+              هل أنت متأكد من حذف هذه الصورة؟ سيتم حذفها نهائياً من قاعدة بيانات <b>Firestore</b> ولن تظهر لأي عميل.
             </p>
 
             <div className="flex items-center gap-3 p-3 rounded-xl bg-slate-950 mb-6 border border-slate-800">
               <img
                 src={photoToDelete.imageUrl}
                 alt={photoToDelete.title}
-                className="w-14 h-14 object-cover rounded-lg"
+                className="w-14 h-14 object-cover rounded-lg bg-slate-900"
               />
               <span className="text-xs font-bold text-slate-200 line-clamp-1">
                 {photoToDelete.title || 'صورة بدون عنوان'}

@@ -19,8 +19,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
  * Cloudinary default configuration for Al Mekawy Home UPVC
  * Uses public preset and secure CDN
  */
-const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'dxk0bmhks';
-const CLOUDINARY_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || 'almekawy_upvc';
+const CLOUDINARY_CLOUD_NAME = process.env.CLOUDINARY_CLOUD_NAME || 'obvb7rtp';
+const CLOUDINARY_PRESET = process.env.CLOUDINARY_UPLOAD_PRESET || 'Al-Mekawy Home';
 
 /**
  * Upload image to Cloudinary or ImgBB

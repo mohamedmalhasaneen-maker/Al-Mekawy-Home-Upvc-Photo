@@ -91,51 +91,6 @@ export const CategoryHero: React.FC<CategoryHeroProps> = ({
           );
         })}
       </div>
-
-      {/* Filter Tabs Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-900/60 p-2 rounded-2xl border border-slate-800/80">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <button
-            onClick={() => onSelectCategory('all')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
-              selectedCategory === 'all'
-                ? 'bg-blue-600 text-white shadow-md shadow-blue-600/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/70'
-            }`}
-          >
-            <Layers className="w-4 h-4" />
-            <span>عرض كل الصور</span>
-            <span className="px-1.5 py-0.2 rounded-md bg-black/20 text-[11px] font-mono">
-              {counts.all}
-            </span>
-          </button>
-
-          {categoryKeys.map((catKey) => {
-            const cat = CATEGORIES[catKey];
-            const isSelected = selectedCategory === catKey;
-            return (
-              <button
-                key={catKey}
-                onClick={() => onSelectCategory(catKey)}
-                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-                  isSelected
-                    ? 'bg-slate-800 text-white border border-blue-500/50 shadow-sm'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
-                }`}
-              >
-                <span>{cat.icon}</span>
-                <span>{cat.titleAr}</span>
-                <span className="text-xs text-slate-500 font-mono">({counts[catKey] || 0})</span>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="hidden sm:flex items-center gap-2 text-xs text-slate-400 px-3">
-          <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-          <span>تحديث سحابي فوري ومباشر</span>
-        </div>
-      </div>
     </div>
   );
 };

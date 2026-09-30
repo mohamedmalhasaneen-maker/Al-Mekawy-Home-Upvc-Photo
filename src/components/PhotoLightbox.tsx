@@ -124,7 +124,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
     const text = encodeURIComponent(
       `مرحباً، أود الاستفسار عن هذا التصميم من منتجات Al-Mekawy Home UPVC (${category.titleAr} - ${currentPhoto.title}):\n${currentPhoto.imageUrl}`
     );
-    window.open(`https://wa.me/?text=${text}`, '_blank');
+    window.open(`https://wa.me/201141761261?text=${text}`, '_blank');
   };
 
   const handleDownload = async () => {

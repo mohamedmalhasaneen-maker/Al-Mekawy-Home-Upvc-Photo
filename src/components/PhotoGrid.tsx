@@ -52,7 +52,7 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
         return (
           <div
             key={photo.id}
-            className="group relative overflow-hidden rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 shadow-md hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col cursor-pointer"
+            className="group relative overflow-hidden rounded-2xl bg-slate-900/90 border border-slate-800 hover:border-blue-500/50 shadow-md hover:shadow-2xl hover:shadow-blue-500/15 transition-all duration-300 ease-out transform hover:-translate-y-1 hover:scale-[1.02] flex flex-col cursor-pointer"
             onClick={() => onSelectPhoto(index)}
           >
             {/* Image Aspect Box */}
@@ -70,7 +70,7 @@ export const PhotoGrid: React.FC<PhotoGridProps> = ({
                 loading="lazy"
                 decoding="async"
                 onLoad={() => setLoadedMap((prev) => ({ ...prev, [photo.id]: true }))}
-                className={`w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 ${
+                className={`w-full h-full object-cover transition-transform duration-500 ease-out group-hover:scale-110 ${
                   isLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
               />

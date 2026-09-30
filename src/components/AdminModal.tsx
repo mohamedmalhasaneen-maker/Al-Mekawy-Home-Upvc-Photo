@@ -23,7 +23,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { auth, firebaseConfig } from '../firebase/config';
-import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { signOut } from 'firebase/auth';
 
 interface AdminModalProps {
   isOpen: boolean;
@@ -49,18 +49,19 @@ export const AdminModal: React.FC<AdminModalProps> = ({
   const [activeTab, setActiveTab] = useState<'upload' | 'manage'>('upload');
   const [manageCategoryFilter, setManageCategoryFilter] = useState<PhotoCategory | 'all'>('all');
 
-  // Upload state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filePreview, setFilePreview] = useState<string | null>(null);
+  // Upload state (Supports multiple unlimited images)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [filePreviews, setFilePreviews] = useState<{ file: File; previewUrl: string }[]>([]);
   const [uploadCategory, setUploadCategory] = useState<PhotoCategory>('windows');
   const [uploadTitle, setUploadTitle] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStepText, setUploadStepText] = useState('');
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'success' | 'error' | 'partial'>('idle');
   const [uploadErrorMessage, setUploadErrorMessage] = useState('');
   const [errorDetails, setErrorDetails] = useState('');
-  const [lastUploadedUrl, setLastUploadedUrl] = useState<string | null>(null);
+  const [uploadedUrls, setUploadedUrls] = useState<string[]>([]);
+  const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
   // Delete modal state
   const [photoToDelete, setPhotoToDelete] = useState<PhotoItem | null>(null);
@@ -76,31 +77,15 @@ export const AdminModal: React.FC<AdminModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Handle Admin PIN login (PIN "1234")
+  // Handle Admin PIN login (PIN "662006")
   const handlePinLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pinInput === '1234' || pinInput === 'admin123' || pinInput.toLowerCase() === 'upvc') {
+    if (pinInput === '662006') {
       setIsAdmin(true);
       setPinError('');
       setPinInput('');
     } else {
-      setPinError('رمز المرور غير صحيح. حاول مرة أخرى (الرمز الافتراضي: 1234)');
-    }
-  };
-
-  // Handle Google Auth
-  const handleGoogleSignIn = async () => {
-    try {
-      setAuthLoading(true);
-      setPinError('');
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-      setIsAdmin(true);
-    } catch (err: any) {
-      console.warn('Google Sign-in notice:', err);
-      setPinError('يمكنك استخدام رمز المرور المباشر: 1234');
-    } finally {
-      setAuthLoading(false);
+      setPinError('رمز المرور غير صحيح. يرجى إدخال رمز المرور الصحيح.');
     }
   };
 
@@ -109,85 +94,153 @@ export const AdminModal: React.FC<AdminModalProps> = ({
       await signOut(auth);
     } catch {}
     setIsAdmin(false);
+    onClose();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Handle File selection
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setUploadStatus('idle');
-      setUploadErrorMessage('');
-      setErrorDetails('');
-      setLastUploadedUrl(null);
+  // Handle adding multiple files (unlimited)
+  const addFiles = (files: FileList | File[]) => {
+    const validImageFiles = Array.from(files).filter((file) => file.type.startsWith('image/'));
+    if (validImageFiles.length === 0) return;
+
+    setUploadStatus('idle');
+    setUploadErrorMessage('');
+    setErrorDetails('');
+    setUploadedUrls([]);
+
+    const newSelected = [...selectedFiles, ...validImageFiles];
+    setSelectedFiles(newSelected);
+
+    // Generate previews for each newly added file
+    validImageFiles.forEach((file) => {
       const reader = new FileReader();
       reader.onload = () => {
-        setFilePreview(reader.result as string);
+        setFilePreviews((prev) => [
+          ...prev,
+          { file, previewUrl: reader.result as string },
+        ]);
       };
       reader.readAsDataURL(file);
+    });
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      addFiles(e.target.files);
     }
   };
 
   const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const file = e.dataTransfer.files?.[0];
-    if (file && file.type.startsWith('image/')) {
-      setSelectedFile(file);
-      setUploadStatus('idle');
-      setUploadErrorMessage('');
-      setErrorDetails('');
-      setLastUploadedUrl(null);
-      const reader = new FileReader();
-      reader.onload = () => {
-        setFilePreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      addFiles(e.dataTransfer.files);
     }
   };
 
-  // Upload handler
+  const removeSelectedFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setFilePreviews((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const clearAllSelectedFiles = () => {
+    setSelectedFiles([]);
+    setFilePreviews([]);
+    setUploadStatus('idle');
+    setUploadErrorMessage('');
+    setErrorDetails('');
+    setUploadedUrls([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Upload handler for unlimited images sequentially
   const handleUploadSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile) {
-      setUploadErrorMessage('يرجى اختيار صورة من جهازك أولاً.');
+    if (selectedFiles.length === 0) {
+      setUploadErrorMessage('يرجى اختيار صورة واحدة على الأقل من جهازك.');
       setUploadStatus('error');
       return;
     }
 
     setIsUploading(true);
-    setUploadProgress(10);
-    setUploadStepText('جاري بدء الاتصال بسحابة Cloudinary...');
     setUploadStatus('idle');
     setUploadErrorMessage('');
     setErrorDetails('');
-    setLastUploadedUrl(null);
+    setUploadedUrls([]);
+    setCurrentFileIndex(0);
 
-    try {
-      const createdItem = await uploadProductPhoto({
-        file: selectedFile,
-        category: uploadCategory,
-        title: uploadTitle,
-        onProgress: (percent, stepText) => {
-          setUploadProgress(percent);
-          if (stepText) setUploadStepText(stepText);
-        },
-      });
+    const totalCount = selectedFiles.length;
+    const successfullyUploaded: string[] = [];
+    const errorsList: string[] = [];
 
+    for (let i = 0; i < totalCount; i++) {
+      const file = selectedFiles[i];
+      setCurrentFileIndex(i + 1);
+
+      const basePercent = Math.round((i / totalCount) * 100);
+      setUploadProgress(basePercent);
+      setUploadStepText(`جاري رفع الصورة (${i + 1} من ${totalCount}): ${file.name}...`);
+
+      try {
+        const titleForThisPhoto =
+          uploadTitle.trim()
+            ? (totalCount > 1 ? `${uploadTitle.trim()} - (${i + 1})` : uploadTitle.trim())
+            : file.name.replace(/\.[^/.]+$/, '');
+
+        const createdItem = await uploadProductPhoto({
+          file,
+          category: uploadCategory,
+          title: titleForThisPhoto,
+          onProgress: (percent, stepText) => {
+            const currentItemWeight = 100 / totalCount;
+            const overallPercent = Math.min(
+              99,
+              Math.round(basePercent + (percent / 100) * currentItemWeight)
+            );
+            setUploadProgress(overallPercent);
+            if (stepText) {
+              setUploadStepText(`[${i + 1}/${totalCount}] ${stepText}`);
+            }
+          },
+        });
+
+        successfullyUploaded.push(createdItem.imageUrl);
+        setUploadedUrls([...successfullyUploaded]);
+      } catch (err: any) {
+        console.error(`Failed uploading file [${i + 1}/${totalCount}] ${file.name}:`, err);
+        const directCloudinaryMsg =
+          err?.cloudinaryMessage ||
+          err?.rawCloudinaryError?.message ||
+          err?.message ||
+          'فشل رفع الصورة إلى Cloudinary.';
+        errorsList.push(`ملف ${file.name}: ${directCloudinaryMsg}`);
+      }
+    }
+
+    setIsUploading(false);
+    setUploadProgress(100);
+
+    if (successfullyUploaded.length === totalCount) {
       setUploadStatus('success');
-      setLastUploadedUrl(createdItem.imageUrl);
-      setSelectedFile(null);
-      setFilePreview(null);
+      setUploadStepText(`تم رفع جميع الصور (${totalCount} صور) بنجاح وحفظها في المعرض.`);
+      // Clear inputs on full success
+      setSelectedFiles([]);
+      setFilePreviews([]);
       setUploadTitle('');
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-    } catch (err: any) {
-      console.error('Upload Error Detailed:', err);
+    } else if (successfullyUploaded.length > 0) {
+      setUploadStatus('partial');
+      setUploadErrorMessage(
+        `تم رفع ${successfullyUploaded.length} صور من أصل ${totalCount}. فشل ${errorsList.length} صور.`
+      );
+      setErrorDetails(errorsList.join('\n'));
+    } else {
       setUploadStatus('error');
-      setUploadErrorMessage(err?.message || 'فشل رفع الصورة إلى Cloudinary.');
-      setErrorDetails(err?.stack || JSON.stringify(err, null, 2) || String(err));
-    } finally {
-      setIsUploading(false);
+      setUploadErrorMessage(errorsList[0] || 'فشل رفع الصور إلى سحابة Cloudinary.');
+      setErrorDetails(errorsList.join('\n'));
     }
   };
 
@@ -280,8 +333,8 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                     type="password"
                     value={pinInput}
                     onChange={(e) => setPinInput(e.target.value)}
-                    placeholder="الرمز الافتراضي: 1234"
-                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center text-lg tracking-widest"
+                    placeholder="••••••"
+                    className="w-full px-4 py-3 rounded-xl bg-slate-950 border border-slate-700 text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-center text-lg tracking-widest"
                     autoFocus
                   />
                 </div>
@@ -298,21 +351,6 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                   className="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-600/30 transition-all"
                 >
                   دخول للوحة التحكم
-                </button>
-
-                <div className="relative flex py-2 items-center">
-                  <div className="flex-grow border-t border-slate-800"></div>
-                  <span className="flex-shrink mx-4 text-xs text-slate-500 font-bold">أو</span>
-                  <div className="flex-grow border-t border-slate-800"></div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleGoogleSignIn}
-                  disabled={authLoading}
-                  className="w-full py-3 rounded-xl bg-slate-800 hover:bg-slate-750 text-white font-bold text-xs sm:text-sm border border-slate-700 flex items-center justify-center gap-2 transition-all"
-                >
-                  <span>تسجيل الدخول باستخدام Google</span>
                 </button>
               </form>
             </div>
@@ -420,18 +458,29 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       />
                     </div>
 
-                    {/* Step 3: Choose Image File */}
+                    {/* Step 3: Choose Image Files (Unlimited) */}
                     <div>
-                      <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5">
-                        3. اختر ملف الصورة من جهازك:
-                      </label>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="block text-xs sm:text-sm font-bold text-slate-200">
+                          3. اختر الصور من جهازك (يدعم عدد لا نهائي من الصور دفعة واحدة):
+                        </label>
+                        {selectedFiles.length > 0 && !isUploading && (
+                          <button
+                            type="button"
+                            onClick={clearAllSelectedFiles}
+                            className="text-xs text-red-400 hover:text-red-300 font-semibold"
+                          >
+                            إلغاء تحديد الكل ({selectedFiles.length})
+                          </button>
+                        )}
+                      </div>
 
                       <div
                         onDragOver={(e) => e.preventDefault()}
                         onDrop={handleDrop}
                         onClick={() => fileInputRef.current?.click()}
                         className={`relative border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all ${
-                          filePreview
+                          filePreviews.length > 0
                             ? 'border-blue-500/60 bg-blue-950/10'
                             : 'border-slate-700 hover:border-blue-500/50 bg-slate-900/50 hover:bg-slate-900'
                         }`}
@@ -440,28 +489,80 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                           ref={fileInputRef}
                           type="file"
                           accept="image/*"
+                          multiple
                           onChange={handleFileChange}
                           className="hidden"
                         />
 
-                        {filePreview ? (
-                          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                            <img
-                              src={filePreview}
-                              alt="معاينة"
-                              className="w-32 h-32 object-cover rounded-xl border border-blue-500/40 shadow-lg"
-                            />
-                            <div className="text-center sm:text-right">
-                              <p className="text-sm font-bold text-white">
-                                {selectedFile?.name}
-                              </p>
-                              <p className="text-xs text-slate-400 mt-0.5">
-                                الحجم: {selectedFile ? (selectedFile.size / (1024 * 1024)).toFixed(2) : 0} ميجابايت
-                              </p>
-                              <p className="text-xs text-blue-400 font-semibold mt-2">
-                                اضغط لتغيير الصورة
-                              </p>
+                        {filePreviews.length > 0 ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between text-xs text-blue-300 border-b border-blue-900/40 pb-2">
+                              <span className="font-bold">
+                                تم تحديد {filePreviews.length} صورة جاهزة للرفع السحابي:
+                              </span>
+                              <span className="text-slate-400">
+                                اضغط أو اسحب لإضافة المزيد من الصور
+                              </span>
                             </div>
+
+                            {/* Grid of selected image previews */}
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-64 overflow-y-auto p-1"
+                            >
+                              {filePreviews.map((item, idx) => (
+                                <div
+                                  key={idx}
+                                  className="relative group rounded-xl overflow-hidden bg-slate-900 border border-slate-700 aspect-square shadow"
+                                >
+                                  <img
+                                    src={item.previewUrl}
+                                    alt={item.file.name}
+                                    className={`w-full h-full object-cover transition-opacity ${
+                                      isUploading && currentFileIndex > idx
+                                        ? 'opacity-40'
+                                        : isUploading && currentFileIndex === idx + 1
+                                        ? 'opacity-80 ring-2 ring-cyan-400'
+                                        : 'opacity-100'
+                                    }`}
+                                  />
+
+                                  {/* Upload status overlay on item */}
+                                  {isUploading && currentFileIndex === idx + 1 && (
+                                    <div className="absolute inset-0 bg-blue-950/80 flex flex-col items-center justify-center p-1">
+                                      <RefreshCw className="w-5 h-5 animate-spin text-cyan-300 mb-1" />
+                                      <span className="text-[9px] text-white font-bold">جاري الرفع</span>
+                                    </div>
+                                  )}
+
+                                  {isUploading && currentFileIndex > idx + 1 && (
+                                    <div className="absolute inset-0 bg-emerald-950/70 flex items-center justify-center">
+                                      <CheckCircle2 className="w-6 h-6 text-emerald-400" />
+                                    </div>
+                                  )}
+
+                                  {/* Remove file button */}
+                                  {!isUploading && (
+                                    <button
+                                      type="button"
+                                      onClick={() => removeSelectedFile(idx)}
+                                      className="absolute top-1 left-1 w-6 h-6 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow opacity-90 hover:opacity-100 hover:scale-110 transition-all"
+                                      title="حذف هذه الصورة"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  )}
+
+                                  <div className="absolute bottom-0 inset-x-0 bg-slate-950/85 px-1 py-0.5 text-[9px] text-slate-300 truncate text-center">
+                                    {(item.file.size / (1024 * 1024)).toFixed(1)} MB
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+
+                            <p className="text-xs text-blue-400 font-semibold pt-1">
+                              {isUploading ? 'جاري المعالجة والرفع السحابي المتتابع...' : '+ اضغط هنا لاختيار صور إضافية'}
+                            </p>
                           </div>
                         ) : (
                           <div className="flex flex-col items-center justify-center gap-2">
@@ -470,10 +571,10 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                             </div>
                             <div>
                               <p className="text-sm font-bold text-slate-200">
-                                اضغط لاختيار صورة من جهازك أو اسحبها هنا
+                                اضغط لاختيار عدد لا نهائي من الصور من جهازك أو اسحبها هنا دفعة واحدة
                               </p>
                               <p className="text-xs text-slate-500 mt-0.5">
-                                يتم الرفع مباشرة إلى سحابة Cloudinary للحصول على رابط دائم وتخزينه في Firestore
+                                يمكنك تحديد 10 أو 50 أو 100+ صورة، وسيتم رفعها سحابياً تلقائياً إلى Cloudinary وحفظها في Firestore
                               </p>
                             </div>
                           </div>
@@ -481,21 +582,30 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Progress indicator during upload */}
+                    {/* Progress indicator & loading spinner during upload */}
                     {isUploading && (
-                      <div className="p-4 rounded-xl bg-blue-950/40 border border-blue-800/40 space-y-2">
-                        <div className="flex items-center justify-between text-xs font-bold text-blue-300">
-                          <span className="flex items-center gap-2">
-                            <RefreshCw className="w-4 h-4 animate-spin text-blue-400" />
-                            <span>{uploadStepText || 'جاري الرفع إلى Cloudinary...'}</span>
+                      <div className="p-4 rounded-2xl bg-gradient-to-r from-blue-950/50 to-indigo-950/50 border border-blue-500/40 shadow-lg shadow-blue-950/30 space-y-3 animate-pulse">
+                        <div className="flex items-center justify-between text-xs sm:text-sm font-bold text-blue-300">
+                          <span className="flex items-center gap-2.5">
+                            <div className="relative flex items-center justify-center">
+                              <RefreshCw className="w-5 h-5 animate-spin text-blue-400" />
+                              <span className="absolute w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+                            </div>
+                            <span className="text-white font-bold">{uploadStepText || 'جاري الرفع السحابي إلى Cloudinary...'}</span>
                           </span>
-                          <span>{uploadProgress}%</span>
+                          <span className="font-mono text-cyan-300 text-sm font-black">{uploadProgress}%</span>
                         </div>
-                        <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div className="w-full h-3 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-700">
                           <div
-                            className="h-full bg-gradient-to-r from-blue-500 to-cyan-400 transition-all duration-200"
+                            className="h-full bg-gradient-to-r from-blue-500 via-cyan-400 to-emerald-400 rounded-full transition-all duration-300 shadow-sm shadow-cyan-400/50"
                             style={{ width: `${uploadProgress}%` }}
                           />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-400">
+                          <span>
+                            تم إنجاز {uploadedUrls.length} من {selectedFiles.length} صورة
+                          </span>
+                          <span>يرجى عدم إغلاق النافذة أثناء الرفع</span>
                         </div>
                       </div>
                     )}
@@ -506,58 +616,97 @@ export const AdminModal: React.FC<AdminModalProps> = ({
                         <div className="flex items-center gap-2.5">
                           <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
                           <div>
-                            <p className="font-bold">تم رفع الصورة بنجاح إلى Cloudinary وحفظها في Firestore ✓</p>
+                            <p className="font-bold">
+                              تم رفع {uploadedUrls.length} صورة بنجاح إلى Cloudinary وحفظها في المعرض ✓
+                            </p>
                             <p className="text-xs text-emerald-400/80">
-                              الصورة الآن محفوظة برابط دائم وتظهر مباشرة في المعرض لجميع العملاء في أي مكان.
+                              جميع الصور المرفوعة أصبحت متاحة فوراً لجميع العملاء في الموقع.
                             </p>
                           </div>
                         </div>
-                        {lastUploadedUrl && (
-                          <div className="mt-2 pt-2 border-t border-emerald-800/40 flex items-center justify-between text-xs">
-                            <span className="text-emerald-400 font-mono truncate max-w-xs sm:max-w-md">
-                              {lastUploadedUrl}
-                            </span>
-                            <a
-                              href={lastUploadedUrl}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1 text-emerald-300 hover:text-white font-bold underline"
-                            >
-                              <span>فتح الرابط</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          </div>
-                        )}
                       </div>
                     )}
 
-                    {/* Detailed Error Message */}
-                    {uploadStatus === 'error' && (
-                      <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/50 text-red-300 text-sm space-y-2">
+                    {/* Partial Upload Message */}
+                    {uploadStatus === 'partial' && (
+                      <div className="p-4 rounded-xl bg-amber-950/40 border border-amber-800/50 text-amber-300 text-sm space-y-2">
                         <div className="flex items-center gap-2.5">
-                          <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                          <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
                           <p className="font-bold">{uploadErrorMessage}</p>
                         </div>
                         {errorDetails && (
-                          <div className="p-2.5 bg-black/40 rounded-lg text-xs font-mono text-red-300 overflow-x-auto ltr text-left">
+                          <div className="p-2.5 bg-black/40 rounded-lg text-xs font-mono text-amber-200 overflow-x-auto ltr text-left">
                             <pre className="whitespace-pre-wrap">{errorDetails}</pre>
                           </div>
                         )}
                       </div>
                     )}
 
-                    {/* Submit Button */}
+                    {/* Detailed Error Message from Cloudinary */}
+                    {uploadStatus === 'error' && (
+                      <div className="p-4 rounded-2xl bg-red-950/50 border border-red-700/60 text-red-200 text-sm space-y-3 shadow-lg">
+                        <div className="flex items-start gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-red-600/20 border border-red-500/30 flex items-center justify-center text-red-400 shrink-0 mt-0.5">
+                            <AlertCircle className="w-5 h-5" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="font-extrabold text-white text-sm">
+                                تنبيه: خطأ أثناء الرفع إلى Cloudinary
+                              </p>
+                              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-red-900/60 border border-red-700/50 text-red-300">
+                                Cloudinary API Error
+                              </span>
+                            </div>
+                            <p className="text-xs sm:text-sm text-red-300 font-bold mt-1">
+                              {uploadErrorMessage}
+                            </p>
+                            <p className="text-xs text-slate-400 mt-1">
+                              تحقق من اتصال الإنترنت أو إعدادات السحابة ثم أعد المحاولة.
+                            </p>
+                          </div>
+                        </div>
+
+                        {errorDetails && (
+                          <div className="mt-2 p-3 bg-black/60 rounded-xl border border-red-900/50 text-xs font-mono text-red-300/90 overflow-x-auto ltr text-left">
+                            <div className="text-[10px] uppercase tracking-wider text-red-400/80 mb-1 border-b border-red-900/40 pb-1">
+                              تفاصيل الأخطاء
+                            </div>
+                            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{errorDetails}</pre>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Submit Button with Loading Spinner */}
                     <button
                       type="submit"
-                      disabled={isUploading || !selectedFile}
-                      className={`w-full py-3.5 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all ${
-                        isUploading || !selectedFile
-                          ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
-                          : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30'
+                      disabled={isUploading || selectedFiles.length === 0}
+                      className={`w-full py-3.5 rounded-xl font-bold text-sm sm:text-base flex items-center justify-center gap-2.5 transition-all ${
+                        isUploading || selectedFiles.length === 0
+                          ? 'bg-slate-800 text-slate-500 cursor-not-allowed border border-slate-700/50'
+                          : 'bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-600/30 active:scale-[0.99]'
                       }`}
                     >
-                      <Upload className="w-5 h-5" />
-                      <span>{isUploading ? 'جاري رفع الصورة...' : 'رفع الصورة إلى المعرض الآن'}</span>
+                      {isUploading ? (
+                        <>
+                          <RefreshCw className="w-5 h-5 animate-spin text-cyan-300" />
+                          <span>
+                            جاري رفع الصور السحابية ({currentFileIndex} من {selectedFiles.length}) — {uploadProgress}%
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-5 h-5" />
+                          <span>
+                            {selectedFiles.length > 1
+                              ? `رفع جميع الصور (${selectedFiles.length} صور) إلى المعرض الآن`
+                              : selectedFiles.length === 1
+                              ? 'رفع الصورة إلى المعرض الآن'
+                              : 'اختر صوراً للرفع'}
+                          </span>
+                        </>
+                      )}
                     </button>
                   </form>
                 </div>

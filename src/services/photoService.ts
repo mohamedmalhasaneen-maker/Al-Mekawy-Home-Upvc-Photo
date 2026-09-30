@@ -48,11 +48,17 @@ async function uploadToCloudinary(
     const data = await response.json().catch(() => null);
 
     if (!response.ok || !data || !data.secure_url) {
-      const errorMsg = data?.error?.message || `HTTP ${response.status}: ${response.statusText}`;
+      // Extract exact message from Cloudinary's error object: e.g. data.error.message
+      const cloudinaryMsg = data?.error?.message;
+      const errorMsg = cloudinaryMsg
+        ? `Cloudinary: ${cloudinaryMsg}`
+        : `HTTP ${response.status}: ${response.statusText || 'Upload Failed'}`;
+      
       console.error(`[Cloudinary Upload Error] (Preset: "${presetName}"):`, data?.error || data || response.statusText);
       const err = new Error(errorMsg);
       (err as any).cloudinaryData = data;
       (err as any).status = response.status;
+      (err as any).cloudinaryMessage = cloudinaryMsg;
       throw err;
     }
 
@@ -106,9 +112,12 @@ export async function uploadProductPhoto({
     cloudinaryResult = await uploadToCloudinary(file, onProgress);
   } catch (uploadError: any) {
     console.error('Fatal Cloudinary Error during upload:', uploadError);
-    throw new Error(
-      `خطأ في الرفع إلى Cloudinary: ${uploadError?.message || 'تعذر الوصول إلى سحابة Cloudinary'}`
-    );
+    // Directly preserve Cloudinary's specific error message
+    const exactMessage = uploadError?.cloudinaryMessage || uploadError?.message || 'تعذر الاتصال بسحابة Cloudinary';
+    const err = new Error(`فشل الرفع إلى Cloudinary: ${exactMessage}`);
+    (err as any).rawCloudinaryError = uploadError?.cloudinaryData?.error || uploadError?.cloudinaryData;
+    (err as any).cloudinaryMessage = exactMessage;
+    throw err;
   }
 
   if (onProgress) onProgress(75, 'تم الحصول على رابط Cloudinary. جاري الحفظ في Firestore...');
@@ -207,6 +216,20 @@ export function subscribeToPhotos(
       onUpdate(items);
     },
     (error) => {
+      // If error is network or backend unavailable, log gracefully and notify caller without unhandled crash
+      const isNetworkIssue =
+        error.code === 'unavailable' ||
+        error.message?.includes('the client is offline') ||
+        error.message?.includes('Could not reach Cloud Firestore');
+
+      if (isNetworkIssue) {
+        console.warn('Firestore is temporarily offline or reconnecting. Using local cache.');
+        if (onError) {
+          onError(error);
+        }
+        return;
+      }
+
       console.error('Real-time photos subscription error:', error);
       if (onError) {
         onError(error);

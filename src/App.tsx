@@ -354,6 +354,16 @@ export default function App() {
               </h5>
               <ul className="space-y-2 text-xs text-slate-400">
                 <li>
+                  <a
+                    href="https://almekawy-home-official.vercel.app/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-cyan-400 hover:text-cyan-300 font-bold transition-colors flex items-center gap-1.5"
+                  >
+                    <span>🌐 الموقع الرسمي لـ Al-Mekawy Home</span>
+                  </a>
+                </li>
+                <li>
                   <button
                     onClick={() => {
                       setSelectedCategory('all');

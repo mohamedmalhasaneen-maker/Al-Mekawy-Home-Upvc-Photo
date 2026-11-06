@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShieldCheck, MessageSquare, Sparkles, Image as ImageIcon, Lock, Globe, ExternalLink, Sliders } from 'lucide-react';
+import { ShieldCheck, MessageSquare, Sparkles, Image as ImageIcon, Lock, Globe, ExternalLink } from 'lucide-react';
 import { PhoneCallIcon } from './BrandIcons';
 import logoImg from '../assets/images/almekawy_logo_1790781390166.jpg';
 
@@ -48,22 +48,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action buttons */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Site Settings Button */}
-            <button
-              onClick={onOpenAdmin}
-              className={`flex items-center gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all shadow-sm ${
-                isAdmin
-                  ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30 ring-2 ring-blue-400/40'
-                  : 'bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-700/80 hover:border-blue-500/40'
-              }`}
-              title="الانتقال إلى إعدادات الموقع ونشر الصور"
-            >
-              <Sliders className="w-4 h-4 text-cyan-400 glass-icon" />
-              <span>إعدادات الموقع</span>
-              {isAdmin && (
-                <span className="hidden sm:inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              )}
-            </button>
           </div>
         </div>
       </div>

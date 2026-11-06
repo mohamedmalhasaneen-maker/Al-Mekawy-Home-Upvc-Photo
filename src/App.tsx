@@ -7,7 +7,7 @@ import { PhotoGridSkeleton } from './components/PhotoGridSkeleton';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { AdminModal } from './components/AdminModal';
 import { FirebaseInfoModal } from './components/FirebaseInfoModal';
-import { AnimatedBackground } from './components/AnimatedBackground';
+
 import { ContactSection } from './components/ContactSection';
 import { ColorSelector } from './components/ColorSelector';
 import { PhotoItem, PhotoCategory, ProductColor, CATEGORIES, PRODUCT_COLORS } from './types/photo';
@@ -230,7 +230,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
-      <AnimatedBackground />
+
       {/* Top Header */}
       <Header
         isAdmin={isAdmin}

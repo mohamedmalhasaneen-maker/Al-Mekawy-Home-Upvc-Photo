@@ -25,7 +25,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { getIsAdmin, loginAdmin, logoutAdmin, subscribeAdminAuth } from '../services/adminAuth';
-import { AnimatedBackground } from '../components/AnimatedBackground';
+
 import {
   PhotoItem,
   PhotoCategory,
@@ -482,7 +482,7 @@ export const DeveloperPage: React.FC = () => {
 
   return (
     <div className="min-h-screen text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white relative overflow-hidden" dir="rtl">
-      <AnimatedBackground />
+
 
       {/* Main Container */}
       <main className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Header } from './components/Header';
 import { CategoryHero } from './components/CategoryHero';
 import { PhotoGrid } from './components/PhotoGrid';
+import { PhotoGridSkeleton } from './components/PhotoGridSkeleton';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { AdminModal } from './components/AdminModal';
 import { FirebaseInfoModal } from './components/FirebaseInfoModal';
@@ -191,12 +192,7 @@ export default function App() {
 
         {/* Photo Gallery Grid */}
         {loading ? (
-          <div className="py-24 flex flex-col items-center justify-center gap-3">
-            <RefreshCw className="w-8 h-8 text-blue-500 animate-spin" />
-            <p className="text-sm font-semibold text-slate-400">
-              جاري تحميل معرض الصور السحابي...
-            </p>
-          </div>
+          <PhotoGridSkeleton />
         ) : (
           <PhotoGrid
             photos={filteredPhotos}

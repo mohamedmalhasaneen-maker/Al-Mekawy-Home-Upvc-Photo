@@ -60,7 +60,7 @@ export const ColorSelector: React.FC<ColorSelectorProps> = ({
               type="button"
               key={colKey}
               onClick={() => onSelectColor(colKey)}
-              className={`group relative overflow-hidden rounded-xl p-3.5 sm:p-4 text-right transition-all duration-300 transform active:scale-[0.97] flex flex-col justify-between gap-2.5 ${
+              className={`group relative overflow-hidden rounded-xl p-2.5 sm:p-3 text-right transition-all duration-300 transform active:scale-[0.97] flex flex-col justify-between gap-1.5 ${
                 isSelected
                   ? `bg-slate-900 border-2 ${colorInfo.borderClass} shadow-lg ${colorInfo.glowClass} ring-2 ring-cyan-500/30`
                   : 'bg-white/[0.03] hover:bg-white/[0.07] border border-white/10 hover:border-white/20'
@@ -75,11 +75,11 @@ export const ColorSelector: React.FC<ColorSelectorProps> = ({
 
               <div className="relative z-10 flex items-center justify-between w-full">
                 {/* Color Dot Indicator */}
-                <div className="flex items-center gap-2.5">
+                <div className="flex items-center gap-2">
                   <div
-                    className={`w-5 h-5 rounded-full shrink-0 transition-transform duration-300 group-hover:scale-125 ${colorInfo.dotColorClass}`}
+                    className={`w-4 h-4 rounded-full shrink-0 transition-transform duration-300 group-hover:scale-110 ${colorInfo.dotColorClass}`}
                   />
-                  <span className={`text-xs sm:text-sm font-bold font-arabic transition-colors ${
+                  <span className={`text-[11px] sm:text-xs font-bold font-arabic transition-colors ${
                     isSelected ? 'text-white' : 'text-slate-300 group-hover:text-white'
                   }`}>
                     {colorInfo.badgeLabel}
@@ -88,25 +88,25 @@ export const ColorSelector: React.FC<ColorSelectorProps> = ({
 
                 {/* Selected Check icon */}
                 {isSelected && (
-                  <div className="w-5 h-5 rounded-full bg-cyan-500/30 border border-cyan-400 text-cyan-300 flex items-center justify-center">
-                    <Check className="w-3 h-3 stroke-[3]" />
+                  <div className="w-4 h-4 rounded-full bg-cyan-500/30 border border-cyan-400 text-cyan-300 flex items-center justify-center">
+                    <Check className="w-2.5 h-2.5 stroke-[3]" />
                   </div>
                 )}
               </div>
 
               {/* Subtitle & Count Badge */}
-              <div className="relative z-10 flex items-center justify-between pt-2 border-t border-white/5 text-[11px]">
+              <div className="relative z-10 flex items-center justify-between pt-1 border-t border-white/5 text-[10px]">
                 <span className="text-slate-400 font-mono">
                   {colorInfo.titleEn}
                 </span>
                 <span
-                  className={`px-2 py-0.5 rounded-full font-mono text-[10px] font-bold ${
+                  className={`px-1.5 py-0 rounded-full font-mono text-[9px] font-bold ${
                     isSelected
                       ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
                       : 'bg-slate-800/80 text-slate-400 border border-slate-700/60'
                   }`}
                 >
-                  {count} {count === 1 ? 'صورة' : 'صور'}
+                  {count}
                 </span>
               </div>
             </button>

@@ -48,28 +48,6 @@ export const Header: React.FC<HeaderProps> = ({
 
           {/* Action buttons */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Official Website Link */}
-            <a
-              href="https://almekawy-home-official.vercel.app/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/30 hover:to-cyan-600/30 text-cyan-300 hover:text-white border border-cyan-500/40 hover:border-cyan-400 transition-all shadow-sm"
-              title="زيارة الموقع الرسمي لشركة Al-Mekawy Home UPVC"
-            >
-              <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-cyan-400 shrink-0 glass-icon" />
-              <span>الموقع الرسمي</span>
-              <ExternalLink className="w-3 h-3 text-cyan-400/80 hidden sm:inline-block glass-icon" />
-            </a>
-
-            {/* Contact Us button */}
-            <a
-              href="#contact-us"
-              className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 hover:border-emerald-500/40 transition-all shadow-sm"
-            >
-              <PhoneCallIcon className="w-4 h-4" />
-              <span className="hidden xs:inline">تواصل معنا</span>
-            </a>
-
             {/* Site Settings Button */}
             <button
               onClick={onOpenAdmin}

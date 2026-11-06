@@ -25,6 +25,7 @@ import {
   Globe,
 } from 'lucide-react';
 import { getIsAdmin, loginAdmin, logoutAdmin, subscribeAdminAuth } from '../services/adminAuth';
+import { AnimatedBackground } from '../components/AnimatedBackground';
 import {
   PhotoItem,
   PhotoCategory,
@@ -480,10 +481,8 @@ export const DeveloperPage: React.FC = () => {
   }, [photos, categoryFilter, colorFilter, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white relative overflow-hidden" dir="rtl">
-      {/* Background ambient lighting */}
-      <div className="absolute -top-32 left-1/4 w-[500px] h-[500px] bg-gradient-to-br from-blue-600/20 to-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 right-1/4 w-[500px] h-[500px] bg-gradient-to-tl from-indigo-600/20 to-blue-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white relative overflow-hidden" dir="rtl">
+      <AnimatedBackground />
 
       {/* Main Container */}
       <main className="relative z-10 flex-1 max-w-6xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">

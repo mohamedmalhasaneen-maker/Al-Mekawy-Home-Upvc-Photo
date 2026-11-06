@@ -93,7 +93,7 @@ export const ContactSection: React.FC = () => {
                   title={`اتصال بـ ${phone1}`}
                   aria-label={`اتصال بـ ${phone1}`}
                 >
-                  <GlassIconBadge className="w-11 h-11" glowBg="bg-cyan-500">
+                  <GlassIconBadge className="w-11 h-11">
                     <PhoneCallIcon className="w-5 h-5" />
                   </GlassIconBadge>
                 </a>
@@ -107,7 +107,7 @@ export const ContactSection: React.FC = () => {
                   title={`واتساب ${phone1}`}
                   aria-label={`واتساب ${phone1}`}
                 >
-                  <GlassIconBadge className="w-11 h-11" glowBg="bg-emerald-500">
+                  <GlassIconBadge className="w-11 h-11">
                     <WhatsAppIcon className="w-5 h-5" />
                   </GlassIconBadge>
                 </a>
@@ -129,7 +129,7 @@ export const ContactSection: React.FC = () => {
                   title={`اتصال بـ ${phone2}`}
                   aria-label={`اتصال بـ ${phone2}`}
                 >
-                  <GlassIconBadge className="w-11 h-11" glowBg="bg-blue-500">
+                  <GlassIconBadge className="w-11 h-11">
                     <PhoneCallIcon className="w-5 h-5" />
                   </GlassIconBadge>
                 </a>
@@ -143,12 +143,23 @@ export const ContactSection: React.FC = () => {
                   title={`واتساب ${phone2}`}
                   aria-label={`واتساب ${phone2}`}
                 >
-                  <GlassIconBadge className="w-11 h-11" glowBg="bg-emerald-500">
+                  <GlassIconBadge className="w-11 h-11">
                     <WhatsAppIcon className="w-5 h-5" />
                   </GlassIconBadge>
                 </a>
               </div>
             </div>
+
+            {/* Official Website Button */}
+            <a
+              href="https://almekawy-home-official.vercel.app/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center justify-center gap-2 w-full p-3.5 rounded-2xl bg-gradient-to-r from-blue-600/20 to-cyan-600/20 hover:from-blue-600/30 hover:to-cyan-600/30 border border-cyan-500/30 text-white font-bold transition-all duration-300 shadow-lg"
+              title="زيارة الموقع الرسمي لشركة Al-Mekawy Home UPVC"
+            >
+              <span>الموقع الرسمي</span>
+            </a>
 
           </div>
 
@@ -171,7 +182,7 @@ export const ContactSection: React.FC = () => {
               title="فيسبوك"
               aria-label="Facebook"
             >
-              <GlassIconBadge className="w-12 h-12 sm:w-13 sm:h-13" glowBg="bg-blue-600">
+              <GlassIconBadge className="w-12 h-12 sm:w-13 sm:h-13">
                 <FacebookIcon className="w-6 h-6 sm:w-6.5 sm:h-6.5" />
               </GlassIconBadge>
             </a>
@@ -185,7 +196,7 @@ export const ContactSection: React.FC = () => {
               title="تيك توك"
               aria-label="TikTok"
             >
-              <GlassIconBadge className="w-12 h-12 sm:w-13 sm:h-13" glowBg="bg-slate-400">
+              <GlassIconBadge className="w-12 h-12 sm:w-13 sm:h-13">
                 <TikTokIcon className="w-6 h-6 sm:w-6.5 sm:h-6.5" />
               </GlassIconBadge>
             </a>
@@ -199,7 +210,7 @@ export const ContactSection: React.FC = () => {
               title="إنستغرام"
               aria-label="Instagram"
             >
-              <GlassIconBadge className="w-12 h-12 sm:w-13 sm:h-13" glowBg="bg-pink-600">
+              <GlassIconBadge className="w-12 h-12 sm:w-13 sm:h-13">
                 <InstagramIcon className="w-6 h-6 sm:w-6.5 sm:h-6.5" />
               </GlassIconBadge>
             </a>

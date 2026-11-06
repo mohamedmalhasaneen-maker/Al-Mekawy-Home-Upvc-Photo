@@ -7,6 +7,7 @@ import { PhotoGridSkeleton } from './components/PhotoGridSkeleton';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { AdminModal } from './components/AdminModal';
 import { FirebaseInfoModal } from './components/FirebaseInfoModal';
+import { AnimatedBackground } from './components/AnimatedBackground';
 import { ContactSection } from './components/ContactSection';
 import { ColorSelector } from './components/ColorSelector';
 import { PhotoItem, PhotoCategory, ProductColor, CATEGORIES, PRODUCT_COLORS } from './types/photo';
@@ -228,7 +229,8 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white">
+      <AnimatedBackground />
       {/* Top Header */}
       <Header
         isAdmin={isAdmin}
@@ -240,11 +242,6 @@ export default function App() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Main Title Hero Banner */}
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900/80 via-blue-950/40 to-slate-900/90 backdrop-blur-lg border border-white/20 shadow-2xl shadow-blue-950/40 p-6 sm:p-12 mb-8 text-center ring-1 ring-white/10">
-          {/* Vibrant ambient gradient glow lights */}
-          <div className="absolute -top-24 left-1/4 w-96 h-96 bg-gradient-to-br from-blue-600/35 to-cyan-400/25 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute -bottom-24 right-1/4 w-96 h-96 bg-gradient-to-tl from-indigo-600/30 to-blue-500/20 rounded-full blur-3xl pointer-events-none" />
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-blue-600/15 via-transparent to-transparent pointer-events-none" />
-
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-900/70 text-cyan-300 border border-cyan-400/30 text-xs sm:text-sm font-semibold mb-5 backdrop-blur-md shadow-md shadow-cyan-950/40">
               <Sparkles className="w-4 h-4 text-cyan-400 animate-pulse glass-icon" />

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { PhotoItem, PhotoCategory, CATEGORIES } from '../types/photo';
+import { PhotoItem, PhotoCategory, ProductColor, CATEGORIES, PRODUCT_COLORS } from '../types/photo';
 import {
   uploadProductPhoto,
   deleteProductPhoto,
@@ -41,6 +41,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [filePreviews, setFilePreviews] = useState<{ file: File; previewUrl: string }[]>([]);
   const [uploadCategory, setUploadCategory] = useState<PhotoCategory>('windows');
+  const [uploadColor, setUploadColor] = useState<ProductColor>('white');
   const [uploadTitle, setUploadTitle] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -155,6 +156,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
         const createdItem = await uploadProductPhoto({
           file,
           category: uploadCategory,
+          color: uploadColor,
           title: titleForThisPhoto,
           onProgress: (percent, stepText) => {
             const currentItemWeight = 100 / totalCount;
@@ -342,10 +344,38 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Step 2: Title / Description */}
+            {/* Step 2: Color Selection */}
             <div>
-              <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5">
-                2. عنوان أو وصف الصورة (اختياري):
+              <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-2 font-arabic">
+                2. اختر تصنيف اللون للمنتج:
+              </label>
+              <div className="grid grid-cols-3 gap-2.5">
+                {(['white', 'beige', 'special'] as ProductColor[]).map((col) => {
+                  const info = PRODUCT_COLORS[col];
+                  const isSelected = uploadColor === col;
+                  return (
+                    <button
+                      type="button"
+                      key={col}
+                      onClick={() => setUploadColor(col)}
+                      className={`p-3 rounded-xl border text-center transition-all flex items-center justify-center gap-2 font-arabic ${
+                        isSelected
+                          ? 'bg-cyan-600/20 border-cyan-500 text-white font-bold ring-2 ring-cyan-500/20 shadow-md'
+                          : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white hover:bg-slate-850'
+                      }`}
+                    >
+                      <span className={`w-3.5 h-3.5 rounded-full shrink-0 ${info.dotColorClass}`} />
+                      <span className="text-xs">{info.badgeLabel}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 3: Title / Description */}
+            <div>
+              <label className="block text-xs sm:text-sm font-bold text-slate-200 mb-1.5 font-arabic">
+                3. عنوان أو وصف الصورة (اختياري):
               </label>
               <input
                 type="text"
@@ -356,11 +386,11 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
               />
             </div>
 
-            {/* Step 3: Choose Multiple Files */}
+            {/* Step 4: Choose Multiple Files */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-xs sm:text-sm font-bold text-slate-200">
-                  3. اختر الصور من جهازك (يدعم رفع عدد لا نهائي من الصور دفعة واحدة):
+                <label className="block text-xs sm:text-sm font-bold text-slate-200 font-arabic">
+                  4. اختر الصور من جهازك (يدعم رفع عدد لا نهائي من الصور دفعة واحدة):
                 </label>
                 {selectedFiles.length > 0 && (
                   <button

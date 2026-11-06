@@ -44,30 +44,14 @@ export const CategoryHero: React.FC<CategoryHeroProps> = ({
                 className={`absolute -right-10 -bottom-10 w-32 h-32 rounded-full opacity-15 blur-2xl transition-opacity group-hover:opacity-30 bg-gradient-to-br ${cat.badgeColor}`}
               />
 
-              <div className="relative z-10 flex items-start justify-between">
+              <div className="relative z-10 flex items-center justify-between w-full">
                 <div className="flex items-center gap-3.5">
-                  <div
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl transition-all duration-300 group-hover:scale-110 ${
-                      isSelected
-                        ? 'glass-icon-box-blue ring-1 ring-blue-400/40 text-white'
-                        : 'glass-icon-box text-slate-100'
-                    }`}
-                  >
-                    <span className="glass-icon select-none inline-block">{cat.icon}</span>
-                  </div>
-
                   <div>
                     <div className="flex items-center gap-2">
                       <h3 className="text-lg sm:text-xl font-bold text-white tracking-wide">
                         {cat.titleAr}
                       </h3>
-                      <span className="text-xs text-slate-400 font-semibold font-mono">
-                        ({cat.titleEn})
-                      </span>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-1">
-                      {cat.description}
-                    </p>
                   </div>
                 </div>
 

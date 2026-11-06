@@ -20,10 +20,11 @@ service cloud.firestore {
 
     function isValidPhoto(data) {
       return data.keys().hasAll(['imageUrl', 'storagePath', 'category']) &&
-        data.keys().hasOnly(['id', 'imageUrl', 'storagePath', 'category', 'title', 'order', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['id', 'imageUrl', 'storagePath', 'category', 'color', 'title', 'order', 'createdAt', 'updatedAt']) &&
         data.imageUrl is string && data.imageUrl.size() <= 1048576 &&
         data.storagePath is string && data.storagePath.size() <= 1024 &&
         isValidCategory(data.category) &&
+        (!('color' in data) || (data.color is string && data.color.size() <= 64)) &&
         (!('title' in data) || (data.title is string && data.title.size() <= 500)) &&
         (!('order' in data) || data.order is number) &&
         (!('id' in data) || (data.id is string && data.id.size() <= 128)) &&

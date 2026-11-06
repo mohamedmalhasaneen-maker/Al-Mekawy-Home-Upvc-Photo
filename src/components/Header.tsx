@@ -1,5 +1,6 @@
 import React from 'react';
-import { ShieldCheck, Phone, MessageSquare, Sparkles, Image as ImageIcon, Lock, Globe, ExternalLink, Sliders } from 'lucide-react';
+import { ShieldCheck, MessageSquare, Sparkles, Image as ImageIcon, Lock, Globe, ExternalLink, Sliders } from 'lucide-react';
+import { PhoneCallIcon } from './BrandIcons';
 import logoImg from '../assets/images/almekawy_logo_1790781390166.jpg';
 
 interface HeaderProps {
@@ -19,11 +20,11 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="flex items-center justify-between h-20">
           {/* Logo and Brand Name */}
           <div className="flex items-center space-x-3 space-x-reverse">
-            <div className="relative flex items-center justify-center w-14 h-14 rounded-2xl overflow-hidden bg-slate-900 border border-amber-500/30 shadow-md shadow-amber-950/20 flex-shrink-0">
+            <div className="relative flex items-center justify-center w-14 h-14 sm:w-16 sm:h-16 rounded-2xl overflow-hidden bg-[#0A1220] border border-amber-500/30 shadow-lg shadow-black/40 flex-shrink-0 p-0.5">
               <img
                 src={logoImg}
-                alt="Al Mekawy Home Logo"
-                className="w-full h-full object-cover"
+                alt="Al Mekawy Home UPVC Logo"
+                className="w-full h-full object-contain rounded-xl"
               />
               <div className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 border-2 border-slate-950 flex items-center justify-center">
                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-ping"></span>
@@ -65,7 +66,7 @@ export const Header: React.FC<HeaderProps> = ({
               href="#contact-us"
               className="flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-slate-900/90 hover:bg-slate-800 text-slate-200 hover:text-white border border-slate-700/80 hover:border-emerald-500/40 transition-all shadow-sm"
             >
-              <Phone className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-400 glass-icon" />
+              <PhoneCallIcon className="w-4 h-4" />
               <span className="hidden xs:inline">تواصل معنا</span>
             </a>
 

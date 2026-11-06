@@ -6,13 +6,13 @@ import {
   ChevronLeft,
   Download,
   Share2,
-  MessageSquare,
   ZoomIn,
   ZoomOut,
   Maximize2,
   Calendar,
   Layers,
 } from 'lucide-react';
+import { WhatsAppIcon } from './BrandIcons';
 
 interface PhotoLightboxProps {
   photos: PhotoItem[];
@@ -267,7 +267,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             onClick={shareViaWhatsApp}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
           >
-            <MessageSquare className="w-4 h-4 glass-icon" />
+            <WhatsAppIcon className="w-5 h-5" />
             <span>طلب أو استفسار عن هذا التصميم</span>
           </button>
         </div>

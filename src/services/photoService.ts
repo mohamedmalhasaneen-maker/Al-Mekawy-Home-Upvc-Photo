@@ -10,7 +10,7 @@ import {
   Unsubscribe
 } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../firebase/config';
-import { PhotoItem, PhotoCategory } from '../types/photo';
+import { PhotoItem, PhotoCategory, ProductColor } from '../types/photo';
 
 export const CLOUDINARY_CLOUD_NAME = 'obvb7rtp';
 export const CLOUDINARY_UPLOAD_PRESET = 'AI-Mekawy Home';
@@ -19,6 +19,7 @@ export const CLOUDINARY_UPLOAD_URL = `https://api.cloudinary.com/v1_1/${CLOUDINA
 export interface UploadPhotoParams {
   file: File;
   category: PhotoCategory;
+  color?: ProductColor;
   title: string;
   onProgress?: (percent: number, stepText?: string) => void;
 }
@@ -70,25 +71,31 @@ async function uploadToCloudinary(
 
   if (onProgress) onProgress(30, 'جاري رفع الصورة مباشرة إلى Cloudinary...');
 
-  try {
-    const result = await tryUpload(CLOUDINARY_UPLOAD_PRESET);
-    console.log('[Cloudinary Upload Success]:', result.secure_url);
-    return result;
-  } catch (primaryErr: any) {
-    // If the exact preset name has a visual font typo (Capital I vs small l in Al/AI), test fallback
-    if (primaryErr?.message?.includes('Upload preset not found')) {
-      console.warn(`[Cloudinary Upload] Preset "${CLOUDINARY_UPLOAD_PRESET}" not found. Trying "Al-Mekawy Home"...`);
-      try {
-        const fallbackResult = await tryUpload('Al-Mekawy Home');
-        console.log('[Cloudinary Upload Fallback Success]:', fallbackResult.secure_url);
-        return fallbackResult;
-      } catch (fallbackErr) {
-        console.error('[Cloudinary Upload Fallback Failed]:', fallbackErr);
-        throw primaryErr;
-      }
+  const presetsToTry = [
+    CLOUDINARY_UPLOAD_PRESET,
+    'Al-Mekawy Home',
+    'ml_default',
+    'unsigned',
+    'almekawy',
+    'default',
+    'upvc',
+    'photos'
+  ];
+
+  let lastError: any = null;
+
+  for (const presetName of presetsToTry) {
+    try {
+      const result = await tryUpload(presetName);
+      console.log(`[Cloudinary Upload Success] with preset "${presetName}":`, result.secure_url);
+      return result;
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`[Cloudinary Upload] Preset "${presetName}" failed or not found. Trying next...`);
     }
-    throw primaryErr;
   }
+
+  throw lastError;
 }
 
 /**
@@ -97,6 +104,7 @@ async function uploadToCloudinary(
 export async function uploadProductPhoto({
   file,
   category,
+  color = 'white',
   title,
   onProgress,
 }: UploadPhotoParams): Promise<PhotoItem> {
@@ -128,6 +136,7 @@ export async function uploadProductPhoto({
     imageUrl: cloudinaryResult.secure_url,
     storagePath: cloudinaryResult.public_id,
     category,
+    color,
     title: title.trim() || getDefaultTitle(category),
     order: timestamp,
     createdAt: new Date().toISOString(),
@@ -176,11 +185,11 @@ export async function deleteProductPhoto(photo: PhotoItem): Promise<void> {
 }
 
 /**
- * Updates metadata (title, category, order) in Firestore
+ * Updates metadata (title, category, color, order) in Firestore
  */
 export async function updatePhotoMetadata(
   photoId: string,
-  data: Partial<Pick<PhotoItem, 'title' | 'category' | 'order'>>
+  data: Partial<Pick<PhotoItem, 'title' | 'category' | 'color' | 'order'>>
 ): Promise<void> {
   try {
     await updateDoc(doc(db, 'photos', photoId), {

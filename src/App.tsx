@@ -7,9 +7,9 @@ import { PhotoGridSkeleton } from './components/PhotoGridSkeleton';
 import { PhotoLightbox } from './components/PhotoLightbox';
 import { AdminModal } from './components/AdminModal';
 import { FirebaseInfoModal } from './components/FirebaseInfoModal';
-import { ContactSection, CONTACT_INFO } from './components/ContactSection';
-import logoImg from './assets/images/almekawy_logo_1790781390166.jpg';
-import { PhotoItem, PhotoCategory, CATEGORIES } from './types/photo';
+import { ContactSection } from './components/ContactSection';
+import { ColorSelector } from './components/ColorSelector';
+import { PhotoItem, PhotoCategory, ProductColor, CATEGORIES, PRODUCT_COLORS } from './types/photo';
 import {
   subscribeToPhotos,
   deleteProductPhoto,
@@ -43,6 +43,7 @@ export default function App() {
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<PhotoCategory | 'all'>('windows');
+  const [selectedColor, setSelectedColor] = useState<ProductColor | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Publishing Settings state synced with Firestore
@@ -103,7 +104,7 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Filtered photos based on category, search, and publishing settings
+  // Filtered photos based on category, color, search, and publishing settings
   const filteredPhotos = useMemo(() => {
     let result = photos;
 
@@ -132,6 +133,13 @@ export default function App() {
       result = result.filter((p) => p.category === selectedCategory);
     }
 
+    if (selectedColor !== 'all') {
+      result = result.filter((p) => {
+        const itemColor = p.color || 'white';
+        return itemColor === selectedColor;
+      });
+    }
+
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -143,9 +151,9 @@ export default function App() {
     }
 
     return result;
-  }, [photos, selectedCategory, searchQuery, isAdmin, publishingSettings]);
+  }, [photos, selectedCategory, selectedColor, searchQuery, isAdmin, publishingSettings]);
 
-  // Photo counts (respecting active publishing settings)
+  // Photo counts for main categories
   const counts = useMemo(() => {
     const activePhotos = isAdmin
       ? photos
@@ -166,6 +174,32 @@ export default function App() {
       balconies: activePhotos.filter((p) => p.category === 'balconies').length,
     };
   }, [photos, isAdmin, publishingSettings]);
+
+  // Color counts for current selected category
+  const colorCounts = useMemo(() => {
+    const activePhotos = isAdmin
+      ? photos
+      : (!publishingSettings.isGalleryPublished
+          ? []
+          : photos.filter((p) => {
+              if (p.category === 'windows' && !publishingSettings.publishWindows) return false;
+              if (p.category === 'doors' && !publishingSettings.publishDoors) return false;
+              if (p.category === 'balconies' && !publishingSettings.publishBalconies) return false;
+              if (publishingSettings.unpublishedPhotoIds.includes(p.id)) return false;
+              return true;
+            }));
+
+    const categoryPhotos = selectedCategory === 'all'
+      ? activePhotos
+      : activePhotos.filter((p) => p.category === selectedCategory);
+
+    return {
+      all: categoryPhotos.length,
+      white: categoryPhotos.filter((p) => p.color === 'white' || (!p.color && true)).length,
+      beige: categoryPhotos.filter((p) => p.color === 'beige').length,
+      special: categoryPhotos.filter((p) => p.color === 'special').length,
+    };
+  }, [photos, selectedCategory, isAdmin, publishingSettings]);
 
   const handleSelectCategory = (category: PhotoCategory | 'all') => {
     setSelectedCategory(category);
@@ -235,6 +269,14 @@ export default function App() {
           selectedCategory={selectedCategory}
           onSelectCategory={handleSelectCategory}
           counts={counts}
+        />
+
+        {/* Color Selection Filter Section */}
+        <ColorSelector
+          selectedCategory={selectedCategory}
+          selectedColor={selectedColor}
+          onSelectColor={setSelectedColor}
+          colorCounts={colorCounts}
         />
 
         {/* Search and Category Summary Bar */}
@@ -335,178 +377,12 @@ export default function App() {
             </div>
           </div>
         )}
-        {/* Contact Us Section */}
+
+        {/* Contact Section */}
         <ContactSection />
       </main>
 
-      {/* Footer */}
-      <footer className="mt-20 border-t border-slate-800/80 bg-slate-950/90 pt-12 pb-8">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Footer Top Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pb-10 border-b border-slate-800/80 text-right">
-            {/* Column 1: Brand Info */}
-            <div>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-900 border border-amber-500/30 shadow-md flex-shrink-0">
-                  <img
-                    src={logoImg}
-                    alt="Al Mekawy Home Logo"
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-                <h4 className="text-base sm:text-lg font-extrabold text-white font-['Outfit',sans-serif]">
-                  Al Mekawy Home <span className="text-blue-400">UPVC</span>
-                </h4>
-              </div>
-              <p className="text-xs sm:text-sm text-slate-400 leading-relaxed mb-4">
-                المعرض الرسمي لمنتجات قطاعات الـ UPVC العالمية — أبواب وشبابيك عازلة للصوت والحرارة والأتربة بأرقى إكسسوارات وتشطيبات مصرية وأوروبية.
-              </p>
-              <div className="flex items-center gap-3">
-                {/* Facebook icon button */}
-                <a
-                  href={CONTACT_INFO.socials.facebook}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-xl glass-icon-box hover:bg-[#1877F2]/30 text-slate-300 hover:text-white flex items-center justify-center transition-all group"
-                  title="صفحتنا على فيسبوك"
-                >
-                  <svg className="w-4 h-4 fill-current glass-icon transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                  </svg>
-                </a>
-                {/* TikTok icon button */}
-                <a
-                  href={CONTACT_INFO.socials.tiktok}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-xl glass-icon-box hover:bg-slate-800 text-slate-300 hover:text-white flex items-center justify-center transition-all group"
-                  title="صفحتنا على تيك توك"
-                >
-                  <svg className="w-4 h-4 fill-current glass-icon transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                    <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 3 15.68a6.34 6.34 0 0 0 10.86 4.46v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1.04-.07z"/>
-                  </svg>
-                </a>
-                {/* Instagram icon button */}
-                <a
-                  href={CONTACT_INFO.socials.instagram}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-xl glass-icon-box hover:bg-[#E1306C]/30 text-slate-300 hover:text-white flex items-center justify-center transition-all group"
-                  title="صفحتنا على إنستجرام"
-                >
-                  <svg className="w-4 h-4 fill-current glass-icon transition-transform group-hover:scale-110" viewBox="0 0 24 24">
-                    <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                  </svg>
-                </a>
-              </div>
-            </div>
 
-            {/* Column 2: Quick Phone & WhatsApp Actions */}
-            <div>
-              <h5 className="text-sm font-bold text-white mb-3">
-                الاتصال السريع وخدمة العملاء
-              </h5>
-              <div className="space-y-2.5">
-                {CONTACT_INFO.phones.map((phone) => (
-                  <div key={phone.number} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs">
-                    <a
-                      href={`tel:${phone.number}`}
-                      className="font-mono text-slate-200 hover:text-blue-400 font-bold transition-colors direction-ltr"
-                      dir="ltr"
-                    >
-                      {phone.formatted}
-                    </a>
-                    <div className="flex items-center gap-1.5">
-                      <a
-                        href={`tel:${phone.number}`}
-                        className="px-2.5 py-1 rounded-lg bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white transition-colors"
-                      >
-                        اتصال
-                      </a>
-                      <a
-                        href={`https://wa.me/${phone.intl}?text=${encodeURIComponent('السلام عليكم، أود الاستفسار عن منتجات Al Mekawy Home UPVC')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-2.5 py-1 rounded-lg bg-emerald-600/30 hover:bg-emerald-600 text-emerald-200 hover:text-white transition-colors"
-                      >
-                        واتساب
-                      </a>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Column 3: Quick Navigation */}
-            <div>
-              <h5 className="text-sm font-bold text-white mb-3">
-                روابط سريعة
-              </h5>
-              <ul className="space-y-2 text-xs text-slate-400">
-                <li>
-                  <a
-                    href="https://almekawy-home-official.vercel.app/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-cyan-400 hover:text-cyan-300 font-bold transition-colors flex items-center gap-1.5"
-                  >
-                    <span>🌐 الموقع الرسمي لـ Al-Mekawy Home</span>
-                  </a>
-                </li>
-                <li>
-                  <button
-                    onClick={() => {
-                      setSelectedCategory('all');
-                      const el = document.getElementById('photo-gallery-section');
-                      el?.scrollIntoView({ behavior: 'smooth' });
-                    }}
-                    className="hover:text-blue-400 transition-colors"
-                  >
-                    • جميع صور المعرض
-                  </button>
-                </li>
-                <li>
-                  <a
-                    href="#contact-us"
-                    className="hover:text-emerald-400 transition-colors"
-                  >
-                    • تواصل معنا وحجز المعاينة
-                  </a>
-                </li>
-                <li>
-                  <button
-                    onClick={() => setFirebaseInfoOpen(true)}
-                    className="hover:text-blue-400 transition-colors flex items-center gap-1.5"
-                  >
-                    <HelpCircle className="w-3.5 h-3.5 text-blue-400 glass-icon" />
-                    <span>حالة السحابة وقواعد البيانات</span>
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => navigate('/developer')}
-                    className="hover:text-cyan-300 transition-colors flex items-center gap-1.5"
-                  >
-                    <Sliders className="w-3.5 h-3.5 text-cyan-400 glass-icon" />
-                    <span>إعدادات الموقع</span>
-                  </button>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Footer Copyright */}
-          <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
-            <div>
-              جميع الحقوق محفوظة © {new Date().getFullYear()} <span className="text-slate-300 font-bold">Al Mekawy Home UPVC</span>.
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
-              <span>متاحون للرد وتلقي الطلبات يومياً</span>
-            </div>
-          </div>
-        </div>
-      </footer>
 
       {/* Lightbox Modal */}
       <PhotoLightbox

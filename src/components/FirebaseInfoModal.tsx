@@ -16,8 +16,8 @@ export const FirebaseInfoModal: React.FC<FirebaseInfoModalProps> = ({ isOpen, on
       <div className="relative w-full max-w-2xl bg-slate-900 border border-slate-700 rounded-3xl p-6 sm:p-8 text-right shadow-2xl">
         <div className="flex items-center justify-between pb-4 border-b border-slate-800 mb-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
-              <ShieldCheck className="w-6 h-6" />
+            <div className="w-10 h-10 rounded-xl glass-icon-box-blue text-blue-400 flex items-center justify-center shadow-md">
+              <ShieldCheck className="w-6 h-6 glass-icon" />
             </div>
             <div>
               <h3 className="text-lg font-bold text-white">
@@ -31,16 +31,16 @@ export const FirebaseInfoModal: React.FC<FirebaseInfoModalProps> = ({ isOpen, on
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white"
+            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 glass-icon" />
           </button>
         </div>
 
         <div className="space-y-4 text-xs sm:text-sm text-slate-300">
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
             <div className="flex items-center gap-2 font-bold text-blue-400">
-              <Cloud className="w-4 h-4" />
+              <Cloud className="w-4 h-4 glass-icon" />
               <span>1. سحابة Cloudinary لتخزين الصور بشكل دائم:</span>
             </div>
             <p className="text-slate-300 leading-relaxed">
@@ -52,21 +52,21 @@ export const FirebaseInfoModal: React.FC<FirebaseInfoModalProps> = ({ isOpen, on
               <div>Endpoint: <span className="text-slate-400">https://api.cloudinary.com/v1_1/{CLOUDINARY_CLOUD_NAME}/image/upload</span></div>
             </div>
             <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs pt-1">
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4 glass-icon" />
               <span>جاهز ومربوط مباشرة بدون الحاجة لأي مفتاح سري (API Secret).</span>
             </div>
           </div>
 
           <div className="p-4 rounded-2xl bg-slate-950 border border-slate-800 space-y-2">
             <div className="flex items-center gap-2 font-bold text-emerald-400">
-              <Database className="w-4 h-4" />
+              <Database className="w-4 h-4 glass-icon" />
               <span>2. قاعدة بيانات Cloud Firestore (حفظ الروابط والتصنيفات):</span>
             </div>
             <p className="text-slate-400 leading-relaxed">
               يتم حفظ الرابط الدائم (<span className="font-mono text-white">secure_url</span>) وبيانات القسم في الـ Collection: <span className="font-mono text-white">photos</span>، مع تحديث لحظي لجميع أجهزة العملاء.
             </p>
             <div className="flex items-center gap-2 text-emerald-400 font-semibold text-xs">
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4 glass-icon" />
               <span>مزامنة فورية حية تعمل عبر هواتف الآيفون والأندرويد والكمبيوتر.</span>
             </div>
           </div>

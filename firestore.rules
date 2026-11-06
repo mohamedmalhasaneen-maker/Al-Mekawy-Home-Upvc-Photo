@@ -56,5 +56,12 @@ service cloud.firestore {
       allow update: if isValidId(photoId) && isValidPhotoData(incoming());
       allow delete: if isValidId(photoId);
     }
+
+    match /settings/{settingId} {
+      // All visitors can read site-wide publishing settings
+      allow get, list: if true;
+      // Allow saving and updating site publishing settings with valid ID
+      allow create, update, delete: if isValidId(settingId);
+    }
   }
 }

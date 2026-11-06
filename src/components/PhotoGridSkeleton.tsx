@@ -17,7 +17,7 @@ export const PhotoGridSkeleton: React.FC = () => {
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-slate-800/40 to-transparent animate-[shimmer_2s_infinite]" />
             
             {/* Badge skeleton on top right */}
-            <div className="absolute top-2.5 right-2.5 w-16 h-6 rounded-full bg-slate-800/70 animate-pulse" />
+            <div className="absolute top-2.5 right-2.5 w-16 h-6 rounded-full glass-icon-box border-white/10 animate-pulse" />
           </div>
 
           {/* Bottom Title & Info Skeleton */}

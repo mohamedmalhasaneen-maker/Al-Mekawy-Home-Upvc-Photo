@@ -47,13 +47,13 @@ export const CategoryHero: React.FC<CategoryHeroProps> = ({
               <div className="relative z-10 flex items-start justify-between">
                 <div className="flex items-center gap-3.5">
                   <div
-                    className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-inner transition-transform group-hover:scale-110 ${
+                    className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl transition-all duration-300 group-hover:scale-110 ${
                       isSelected
-                        ? 'bg-blue-600/20 border border-blue-400/40 text-white'
-                        : 'bg-slate-800/80 border border-slate-700/60'
+                        ? 'glass-icon-box-blue ring-1 ring-blue-400/40 text-white'
+                        : 'glass-icon-box text-slate-100'
                     }`}
                   >
-                    <span>{cat.icon}</span>
+                    <span className="glass-icon select-none inline-block">{cat.icon}</span>
                   </div>
 
                   <div>

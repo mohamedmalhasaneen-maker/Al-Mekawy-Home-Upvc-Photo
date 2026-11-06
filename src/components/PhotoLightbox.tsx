@@ -154,8 +154,8 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
       {/* Top action bar */}
       <div className="absolute top-0 inset-x-0 z-20 flex items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
         <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-blue-600/30 text-blue-300 border border-blue-500/30">
-            <span>{category.icon}</span>
+          <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold glass-icon-box-blue text-blue-300 shadow-md">
+            <span className="glass-icon">{category.icon}</span>
             <span>{category.titleAr}</span>
           </span>
           <span className="text-xs sm:text-sm text-slate-300 font-mono">
@@ -167,31 +167,31 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
           {/* Zoom toggle */}
           <button
             onClick={() => setIsZoomed(!isZoomed)}
-            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white transition-colors"
+            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white transition-all shadow-md backdrop-blur-md border border-white/10"
             title={isZoomed ? 'تصغير' : 'تكبير'}
             aria-label="تكبير أو تصغير الصورة"
           >
-            {isZoomed ? <ZoomOut className="w-5 h-5" /> : <ZoomIn className="w-5 h-5" />}
+            {isZoomed ? <ZoomOut className="w-5 h-5 glass-icon" /> : <ZoomIn className="w-5 h-5 glass-icon" />}
           </button>
 
           {/* Download button */}
           <button
             onClick={handleDownload}
-            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white transition-colors"
+            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-700 text-slate-200 hover:text-white transition-all shadow-md backdrop-blur-md border border-white/10"
             title="تحميل الصورة"
             aria-label="تحميل الصورة بجودة كاملة"
           >
-            <Download className="w-5 h-5" />
+            <Download className="w-5 h-5 glass-icon" />
           </button>
 
           {/* Close button */}
           <button
             onClick={onClose}
-            className="p-2.5 rounded-xl bg-red-600/80 hover:bg-red-500 text-white transition-colors"
+            className="p-2.5 rounded-xl bg-red-600/80 hover:bg-red-500 text-white transition-all shadow-md backdrop-blur-md border border-red-400/30"
             title="إغلاق (Esc)"
             aria-label="إغلاق نافذة العرض"
           >
-            <X className="w-5 h-5" />
+            <X className="w-5 h-5 glass-icon" />
           </button>
         </div>
       </div>
@@ -230,7 +230,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             className="absolute right-3 sm:right-6 top-1/2 -translate-y-1/2 z-20 p-3 sm:p-4 rounded-full bg-slate-900/80 hover:bg-blue-600 text-white shadow-xl backdrop-blur-md border border-slate-700/50 hover:border-blue-400 transition-all active:scale-95"
             aria-label="الصورة السابقة"
           >
-            <ChevronRight className="w-6 h-6" />
+            <ChevronRight className="w-6 h-6 glass-icon" />
           </button>
 
           {/* Next Button (Left side in RTL) */}
@@ -239,7 +239,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             className="absolute left-3 sm:left-6 top-1/2 -translate-y-1/2 z-20 p-3 sm:p-4 rounded-full bg-slate-900/80 hover:bg-blue-600 text-white shadow-xl backdrop-blur-md border border-slate-700/50 hover:border-blue-400 transition-all active:scale-95"
             aria-label="الصورة التالية"
           >
-            <ChevronLeft className="w-6 h-6" />
+            <ChevronLeft className="w-6 h-6 glass-icon" />
           </button>
         </>
       )}
@@ -255,7 +255,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
               <span>{category.titleAr} - Al Mekawy Home UPVC</span>
               {currentPhoto.createdAt && (
                 <span className="flex items-center gap-1 font-mono text-slate-500">
-                  <Calendar className="w-3 h-3" />
+                  <Calendar className="w-3 h-3 glass-icon" />
                   {new Date(currentPhoto.createdAt).toLocaleDateString('ar-EG')}
                 </span>
               )}
@@ -267,7 +267,7 @@ export const PhotoLightbox: React.FC<PhotoLightboxProps> = ({
             onClick={shareViaWhatsApp}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold shadow-lg shadow-emerald-600/30 transition-all active:scale-95"
           >
-            <MessageSquare className="w-4 h-4" />
+            <MessageSquare className="w-4 h-4 glass-icon" />
             <span>طلب أو استفسار عن هذا التصميم</span>
           </button>
         </div>

@@ -56,6 +56,22 @@
         "createdAt": { "type": "string", "maxLength": 64 }
       },
       "required": ["data"]
+    },
+    "PublishingSettings": {
+      "title": "PublishingSettings",
+      "description": "Global website photo publishing and visibility settings",
+      "type": "object",
+      "properties": {
+        "isGalleryPublished": { "type": "boolean" },
+        "publishWindows": { "type": "boolean" },
+        "publishDoors": { "type": "boolean" },
+        "publishBalconies": { "type": "boolean" },
+        "unpublishedPhotoIds": { "type": "array" },
+        "allowLightboxViewing": { "type": "boolean" },
+        "watermarkOrBadgeVisible": { "type": "boolean" },
+        "noticeMessage": { "type": "string", "maxLength": 500 },
+        "updatedAt": { "type": "string", "maxLength": 64 }
+      }
     }
   },
   "firestore": {
@@ -66,6 +82,10 @@
     "/photos_data/{photoId}": {
       "schema": "PhotoData",
       "description": "Collection of cloud image data payloads"
+    },
+    "/settings/{settingId}": {
+      "schema": "PublishingSettings",
+      "description": "Site-wide configuration and photo publishing rules"
     }
   }
 }
